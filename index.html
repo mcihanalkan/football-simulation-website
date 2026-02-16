@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Futbol Ligi Simülasyon Sistemi</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><i class="fas fa-futbol"></i> Futbol Ligi Simülasyon Sistemi</h1>
+            <nav>
+                <ul>
+                    <li><a href="#dashboard" class="nav-link active" data-section="dashboard">
+                        <i class="fas fa-tachometer-alt"></i> Ana Sayfa
+                    </a></li>
+                    <li><a href="#teams" class="nav-link" data-section="teams">
+                        <i class="fas fa-users"></i> Takımlar
+                    </a></li>
+                    <li><a href="#leagues" class="nav-link" data-section="leagues">
+                        <i class="fas fa-trophy"></i> Ligler
+                    </a></li>
+                    <li><a href="#seasons" class="nav-link" data-section="seasons">
+                        <i class="fas fa-calendar"></i> Sezonlar
+                    </a></li>
+                    <li><a href="#european" class="nav-link" data-section="european">
+                        <i class="fas fa-globe-europe"></i> Avrupa Kupaları
+                    </a></li>
+                    <li><a href="#coefficients" class="nav-link" data-section="coefficients">
+                        <i class="fas fa-chart-line"></i> Ülke Katsayıları
+                    </a></li>
+                    <li><a href="#settings" class="nav-link" data-section="settings">
+                        <i class="fas fa-cog"></i> Ayarlar
+                    </a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Dashboard Section -->
+        <section id="dashboard" class="section active">
+            <h2>Ana Sayfa</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <i class="fas fa-users"></i>
+                    <div class="stat-info">
+                        <h3 id="total-teams">0</h3>
+                        <p>Toplam Takım</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-trophy"></i>
+                    <div class="stat-info">
+                        <h3 id="total-leagues">9</h3>
+                        <p>Lig Sayısı</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-calendar"></i>
+                    <div class="stat-info">
+                        <h3 id="current-season">2024-25</h3>
+                        <p>Mevcut Sezon</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-futbol"></i>
+                    <div class="stat-info">
+                        <h3 id="total-matches">0</h3>
+                        <p>Toplam Maç</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-content">
+                <div class="recent-activity">
+                    <h3>Son Aktiviteler</h3>
+                    <div id="activity-list" class="activity-list">
+                        <p class="no-data">Henüz aktivite bulunmuyor.</p>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <h3>Hızlı İşlemler</h3>
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" onclick="showSection('teams')">
+                            <i class="fas fa-plus"></i> Takım Ekle
+                        </button>
+                        <button class="btn btn-success" onclick="simulateSeason()">
+                            <i class="fas fa-play"></i> Sezon Simüle Et
+                        </button>
+                        <button class="btn btn-info" onclick="showSection('coefficients')">
+                            <i class="fas fa-chart-line"></i> Katsayıları Görüntüle
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Teams Section -->
+        <section id="teams" class="section">
+            <h2>Takım Yönetimi</h2>
+            <div class="section-controls">
+                <button class="btn btn-primary" onclick="showAddTeamModal()">
+                    <i class="fas fa-plus"></i> Yeni Takım Ekle
+                </button>
+                <button class="btn btn-secondary" onclick="initializeDefaultTeams()">
+                    <i class="fas fa-download"></i> Varsayılan Takımları Yükle
+                </button>
+                <button class="btn btn-warning" onclick="exportData()">
+                    <i class="fas fa-export"></i> Verileri Dışa Aktar
+                </button>
+            </div>
+
+            <div class="teams-container">
+                <div class="teams-filters">
+                    <select id="league-filter" onchange="filterTeams()">
+                        <option value="">Tüm Ligler</option>
+                        <option value="La Liga">🇪🇸 La Liga</option>
+                        <option value="Bundesliga">🇩🇪 Bundesliga</option>
+                        <option value="Premier League">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
+                        <option value="Serie A">🇮🇹 Serie A</option>
+                        <option value="Süper Lig">🇹🇷 Süper Lig</option>
+                        <option value="Ligue 1">🇫🇷 Ligue 1</option>
+                        <option value="Liga Portugal">🇵🇹 Liga Portugal</option>
+                        <option value="Scottish Premiership">🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scottish Premiership</option>
+                        <option value="Czech First League">🇨🇿 Czech First League</option>
+                        <option value="Belgium Pro League">🇧🇪 Belgium Pro League</option>
+                        <option value="Super League Greece">🇬🇷 Super League Greece</option>
+                        <option value="Austrian Bundesliga">🇦🇹 Austrian Bundesliga</option>
+                        <option value="Danish Superliga">🇩🇰 Danish Superliga</option>
+                        <option value="Ukrainian Premier League">🇺🇦 Ukrainian Premier League</option>
+                        <option value="Swiss Super League">🇨🇭 Swiss Super League</option>
+                        <option value="Allsvenskan">🇸🇪 Allsvenskan</option>
+                        <option value="Eredivisie">🇳🇱 Eredivisie</option>
+                        <option value="Cypriot First Division">🇨🇾 Cypriot First Division</option>
+                        <option value="Ekstraklasa">🇵🇱 Ekstraklasa</option>
+                        <option value="Eliteserien">🇳🇴 Eliteserien</option>
+                        <option value="NB I">🇭🇺 NB I</option>
+                        <option value="HNL">🇭🇷 HNL</option>
+                        <option value="Liga 1">🇷🇴 Liga 1</option>
+                        <option value="SuperLiga">🇷🇸 SuperLiga</option>
+                    </select>
+                    <input type="text" id="team-search" placeholder="Takım ara..." oninput="filterTeams()">
+                </div>
+
+                <div id="teams-list" class="teams-grid">
+                    <!-- Teams will be dynamically populated -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Leagues Section -->
+        <section id="leagues" class="section">
+            <h2>Lig Durumları</h2>
+            <div class="leagues-container">
+                <div class="league-tabs">
+                    <button class="league-tab active" data-league="La Liga">🇪🇸 La Liga</button>
+                    <button class="league-tab" data-league="Bundesliga">🇩🇪 Bundesliga</button>
+                    <button class="league-tab" data-league="Premier League">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</button>
+                    <button class="league-tab" data-league="Serie A">🇮🇹 Serie A</button>
+                    <button class="league-tab" data-league="Süper Lig">🇹🇷 Süper Lig</button>
+                    <button class="league-tab" data-league="Ligue 1">🇫🇷 Ligue 1</button>
+                    <button class="league-tab" data-league="Liga Portugal">🇵🇹 Liga Portugal</button>
+                    <button class="league-tab" data-league="Scottish Premiership">🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scottish Prem</button>
+                    <button class="league-tab" data-league="Czech First League">🇨🇿 Czech League</button>
+                    <button class="league-tab" data-league="Belgium Pro League">🇧🇪 Belgium</button>
+                    <button class="league-tab" data-league="Super League Greece">🇬🇷 Greece</button>
+                    <button class="league-tab" data-league="Austrian Bundesliga">🇦🇹 Austria</button>
+                    <button class="league-tab" data-league="Danish Superliga">🇩🇰 Denmark</button>
+                    <button class="league-tab" data-league="Eredivisie">🇳🇱 Eredivisie</button>
+                </div>
+
+                <div id="league-table" class="league-table-container">
+                    <!-- League table will be dynamically populated -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Seasons Section -->
+        <section id="seasons" class="section">
+            <h2>Sezon Yönetimi</h2>
+            <div class="season-controls">
+                <div class="season-info">
+                    <h3>Mevcut Sezon: <span id="current-season-display">2028-29</span></h3>
+                    <p>Durum: <span id="season-status">Hazırlık</span></p>
+                </div>
+                <div class="season-actions">
+                    <button class="btn btn-success" onclick="simulateFullSeason()">
+                        <i class="fas fa-play"></i> Tam Sezon Simüle Et
+                    </button>
+                    <button class="btn btn-primary" onclick="simulateWeek()">
+                        <i class="fas fa-forward"></i> Hafta Simüle Et
+                    </button>
+                    <button class="btn btn-warning" onclick="resetSeason()">
+                        <i class="fas fa-undo"></i> Sezonu Sıfırla
+                    </button>
+                    <button class="btn btn-info" onclick="advanceSeason()">
+                        <i class="fas fa-step-forward"></i> Sonraki Sezon
+                    </button>
+                    <button class="btn btn-danger" onclick="deleteCompleteSeason(footballSim.currentSeason)">
+                        <i class="fas fa-trash"></i> Bu Sezonu Komple Sil
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Weekly Fixtures Section -->
+            <div class="fixtures-section">
+                <h3>Haftalık Fikstür</h3>
+                <div class="fixture-controls">
+                    <select id="fixture-league" onchange="updateFixtureView()">
+                        <option value="">Lig Seçin</option>
+                        <option value="Premier League">Premier League</option>
+                        <option value="La Liga">La Liga</option>
+                        <option value="Serie A">Serie A</option>
+                        <option value="Bundesliga">Bundesliga</option>
+                        <option value="Ligue 1">Ligue 1</option>
+                        <option value="Liga Portugal">Liga Portugal</option>
+                        <option value="Eredivisie">Eredivisie</option>
+                        <option value="Süper Lig">Süper Lig</option>
+                        <option value="Belgium Pro League">Belgium Pro League</option>
+                    </select>
+                    <div class="week-navigation">
+                        <button class="btn btn-secondary" onclick="previousWeek()" id="prev-week-btn">
+                            <i class="fas fa-chevron-left"></i> Önceki Hafta
+                        </button>
+                        <span id="current-week-display">Hafta 1</span>
+                        <button class="btn btn-secondary" onclick="nextWeek()" id="next-week-btn">
+                            Sonraki Hafta <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <button class="btn btn-success" onclick="simulateCurrentWeek()" id="simulate-week-btn">
+                        <i class="fas fa-play"></i> Bu Haftayı Simüle Et
+                    </button>
+                </div>
+                
+                <div id="weekly-fixtures" class="weekly-fixtures">
+                    <!-- Weekly fixtures will be displayed here -->
+                </div>
+            </div>
+
+            <div class="season-progress">
+                <h3>Sezon İlerleyişi</h3>
+                <div id="season-progress-bars">
+                    <!-- Progress bars for each league will be here -->
+                </div>
+            </div>
+
+            <div class="match-results">
+                <h3>Son Maç Sonuçları</h3>
+                <div id="recent-matches" class="matches-grid">
+                    <!-- Recent matches will be displayed here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- European Competitions Section -->
+        <section id="european" class="section">
+            <h2>Avrupa Kupaları</h2>
+            <div class="european-tabs">
+                <button class="european-tab active" data-competition="ucl">
+                    <i class="fas fa-star"></i> Champions League
+                </button>
+                <button class="european-tab" data-competition="uel">
+                    <i class="fas fa-trophy"></i> Europa League
+                </button>
+                <button class="european-tab" data-competition="uecl">
+                    <i class="fas fa-medal"></i> Conference League
+                </button>
+            </div>
+
+            <div id="european-content" class="european-content">
+                <div class="qualification-info">
+                    <h3>Katılım Durumu</h3>
+                    <div id="qualification-status">
+                        <!-- Qualification status will be shown here -->
+                    </div>
+                </div>
+
+                <div class="european-points">
+                    <h3>Puan Durumu</h3>
+                    <div id="european-points-table">
+                        <!-- European points table will be here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Coefficients Section -->
+        <section id="coefficients" class="section">
+            <h2>UEFA Katsayıları ve Puanlar</h2>
+            
+            <div class="coefficient-tabs">
+                <button class="coefficient-tab active" data-tab="league-rankings">Lig Sıralaması</button>
+                <button class="coefficient-tab" data-tab="team-points">Takım Puanları</button>
+                <button class="coefficient-tab" data-tab="historical">Geçmiş Veriler</button>
+            </div>
+
+            <div class="coefficients-container">
+                <!-- League Rankings Tab -->
+                <div id="league-rankings" class="coefficient-content active">
+                    <div id="coefficients-ranking">
+                        <!-- Country coefficients ranking will be here -->
+                    </div>
+                </div>
+
+                <!-- Team Points Tab -->
+                <div id="team-points" class="coefficient-content">
+                    <div class="team-points-controls">
+                        <select id="team-points-league" onchange="filterTeamPoints()">
+                            <option value="">Tüm Ligler</option>
+                            <option value="La Liga">🇪🇸 La Liga</option>
+                            <option value="Bundesliga">🇩🇪 Bundesliga</option>
+                            <option value="Premier League">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
+                            <option value="Serie A">🇮🇹 Serie A</option>
+                            <option value="Süper Lig">🇹🇷 Süper Lig</option>
+                            <option value="Ligue 1">🇫🇷 Ligue 1</option>
+                            <option value="Liga Portugal">🇵🇹 Liga Portugal</option>
+                        </select>
+                        <select id="team-points-season" onchange="filterTeamPoints()">
+                            <option value="">Tüm Sezonlar</option>
+                            <option value="2028-29">2028-29</option>
+                            <option value="2027-28">2027-28</option>
+                            <option value="2026-27">2026-27</option>
+                        </select>
+                    </div>
+                    <div id="team-points-table">
+                        <!-- Team points table will be here -->
+                    </div>
+                </div>
+
+                <!-- Historical Data Tab -->
+                <div id="historical" class="coefficient-content">
+                    <h3>Son 5 Sezon Katsayıları</h3>
+                    <div id="historical-coefficients">
+                        <!-- Historical coefficients will be here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings" class="section">
+            <h2>Sistem Ayarları</h2>
+            <div class="settings-container">
+                <div class="settings-group">
+                    <h3>Simülasyon Ayarları</h3>
+                    <div class="setting-item">
+                        <label>Ev Sahibi Avantajı:</label>
+                        <input type="range" id="home-advantage" min="0" max="20" value="10">
+                        <span id="home-advantage-value">10%</span>
+                    </div>
+                    <div class="setting-item">
+                        <label>Reytinge Dayalı Sonuç Etkisi:</label>
+                        <input type="range" id="rating-effect" min="50" max="90" value="70">
+                        <span id="rating-effect-value">70%</span>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Veri Yönetimi</h3>
+                    <div class="setting-item">
+                        <button class="btn btn-warning" onclick="exportAllData()">
+                            <i class="fas fa-download"></i> Tüm Verileri Dışa Aktar
+                        </button>
+                        <button class="btn btn-info" onclick="importData()">
+                            <i class="fas fa-upload"></i> Veri İçe Aktar
+                        </button>
+                    </div>
+                    <div class="setting-item">
+                        <button class="btn btn-danger" onclick="resetAllData()">
+                            <i class="fas fa-trash"></i> Tüm Verileri Sıfırla
+                        </button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <h3>Reyting Ayarları</h3>
+                    <div class="setting-item">
+                        <label>Reyting Güncelleme Periyodu:</label>
+                        <select id="rating-update-period">
+                            <option value="3">3 Sezon</option>
+                            <option value="2">2 Sezon</option>
+                            <option value="1">Her Sezon</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <div id="add-team-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('add-team-modal')">&times;</span>
+            <h3>Yeni Takım Ekle</h3>
+            <form id="add-team-form">
+                <div class="form-group">
+                    <label for="team-name">Takım Adı:</label>
+                    <input type="text" id="team-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="team-league">Lig:</label>
+                    <select id="team-league" required>
+                        <option value="">Lig Seçin</option>
+                        <option value="Premier League">Premier League</option>
+                        <option value="La Liga">La Liga</option>
+                        <option value="Serie A">Serie A</option>
+                        <option value="Bundesliga">Bundesliga</option>
+                        <option value="Ligue 1">Ligue 1</option>
+                        <option value="Liga Portugal">Liga Portugal</option>
+                        <option value="Eredivisie">Eredivisie</option>
+                        <option value="Süper Lig">Süper Lig</option>
+                        <option value="Belgium Pro League">Belgium Pro League</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="team-rating">Başlangıç Reytingi (0.5 - 9.9):</label>
+                    <input type="number" id="team-rating" min="0.5" max="9.9" step="0.1" value="7.5" required>
+                </div>
+                <div class="form-group">
+                    <label for="team-country">Ülke:</label>
+                    <input type="text" id="team-country" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('add-team-modal')">İptal</button>
+                    <button type="submit" class="btn btn-primary">Takım Ekle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="edit-team-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('edit-team-modal')">&times;</span>
+            <h3>Takım Düzenle</h3>
+            <form id="edit-team-form">
+                <div class="form-group">
+                    <label for="edit-team-name">Takım Adı:</label>
+                    <input type="text" id="edit-team-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-team-league">Lig:</label>
+                    <select id="edit-team-league" required>
+                        <option value="">Lig Seçin</option>
+                        <option value="Premier League">Premier League</option>
+                        <option value="La Liga">La Liga</option>
+                        <option value="Serie A">Serie A</option>
+                        <option value="Bundesliga">Bundesliga</option>
+                        <option value="Ligue 1">Ligue 1</option>
+                        <option value="Liga Portugal">Liga Portugal</option>
+                        <option value="Eredivisie">Eredivisie</option>
+                        <option value="Süper Lig">Süper Lig</option>
+                        <option value="Belgium Pro League">Belgium Pro League</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-team-rating">Reyting (0.5 - 9.9):</label>
+                    <input type="number" id="edit-team-rating" min="0.5" max="9.9" step="0.1" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('edit-team-modal')">İptal</button>
+                    <button type="submit" class="btn btn-primary">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="match-details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('match-details-modal')">&times;</span>
+            <h3>Maç Detayları</h3>
+            <div id="match-details-content">
+                <!-- Match details will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 Futbol Ligi Simülasyon Sistemi. Tüm hakları saklıdır.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
