@@ -1744,211 +1744,110 @@ class FootballSimulation {
 
         if (state.phase === 'playoff_draw') {
             const st = state.standingsOrder || [];
-            
-            // Sıralı eşleşme grupları
-            const playoffGroups = [
-                { name: 'Eşleşme 1', high: st.slice(8, 10), low: st.slice(22, 24) }, // 9-10 vs 23-24
-                { name: 'Eşleşme 2', high: st.slice(10, 12), low: st.slice(20, 22) }, // 11-12 vs 21-22
-                { name: 'Eşleşme 3', high: st.slice(12, 14), low: st.slice(18, 20) }, // 13-14 vs 19-20
-                { name: 'Eşleşme 4', high: st.slice(14, 16), low: st.slice(16, 18) }  // 15-16 vs 17-18
+            const pgDefs = [
+                { label: 'Eşleşme 1', highRange: '9-10',  lowRange: '23-24', high: st.slice(8,10),  low: st.slice(22,24) },
+                { label: 'Eşleşme 2', highRange: '11-12', lowRange: '21-22', high: st.slice(10,12), low: st.slice(20,22) },
+                { label: 'Eşleşme 3', highRange: '13-14', lowRange: '19-20', high: st.slice(12,14), low: st.slice(18,20) },
+                { label: 'Eşleşme 4', highRange: '15-16', lowRange: '17-18', high: st.slice(14,16), low: st.slice(16,18) },
             ];
-            
-            const drawn = new Set(state.playoffPairs.flatMap(p => [p.team1, p.team2]));
-            
-            // Takımların lig bilgilerini al
-            const getTeamLeague = (teamName) => {
-                const team = this.teams.find(t => t.name === teamName);
-                return team ? team.league : '';
+            const drawn   = new Set(state.playoffPairs.flatMap(p => [p.team1, p.team2]));
+            const temp    = state._playoffTemp || {};
+            const selHigh = temp.selHigh || null;
+            const selLow  = temp.selLow  || null;
+            const hidHigh = temp.hidHigh || null;
+            const hidLow  = temp.hidLow  || null;
+            const getTeamLeague = (n) => this.teams.find(t => t.name === n)?.league || '';
+            const gi = state.playoffPairs.length;
+            const currentGroup = gi < pgDefs.length ? pgDefs[gi] : null;
+
+            const renderBall = (team, side, selH, selL, hidH, hidL, gtl) => {
+                const revealed  = side === 'high' ? selH : selL;
+                const hidden    = side === 'high' ? hidH : hidL;
+                const otherRev  = side === 'high' ? selL : selH;
+                const thisLig   = gtl(team);
+                const otherLig  = otherRev ? gtl(otherRev) : null;
+                const sameLeague = otherLig && otherLig === thisLig && otherLig !== '';
+                const safeTeam = team.replace(/'/g, "\\'");
+
+                if (hidden === team) {
+                    return `<div class="lottery-ball ball-hidden" onclick="window.footballSim._poReveal('${side}')">
+                        <span class="ball-icon">⚽</span><span class="ball-hint">Tıkla &amp; Aç</span>
+                    </div>`;
+                }
+                if (revealed === team) {
+                    const cls = otherRev ? 'ball-confirmed' : 'ball-revealed';
+                    return `<div class="lottery-ball ${cls}">
+                        <span class="ball-name">${team}</span><span class="ball-league">${thisLig}</span>
+                    </div>`;
+                }
+                if (sameLeague) {
+                    return `<div class="lottery-ball ball-disabled" title="Aynı lig: ${thisLig}">
+                        <span class="ball-icon">⚽</span><span class="ball-hint" style="color:#f87171;font-size:0.65rem">Aynı lig</span>
+                    </div>`;
+                }
+                return `<div class="lottery-ball ball-available" onclick="window.footballSim._poSelect('${safeTeam}','${side}')">
+                    <span class="ball-icon">⚽</span><span class="ball-hint">Seç</span>
+                </div>`;
             };
-            
-            html += `
-                <div class="draw-ceremony">
-                    <h4>🎯 Playoff Kura Çekimi</h4>
-                    <p>Sıralı playoff eşleşmeleri (9-24 arası takımlar)</p>
-                    
-                    <div class="draw-progress">
-                        <div class="draw-progress-fill" style="width: ${(state.playoffPairs.length / 4 * 100)}%"></div>
-                    </div>
-                    
-                    <div class="draw-pairs-container">
-                        ${state.playoffPairs.map(pair => `
-                            <div class="draw-pair">
-                                <div class="draw-pair-teams">
-                                    ${pair.team1} <span class="vs">vs</span> ${pair.team2}
-                                </div>
-                                <div class="draw-pair-league">${getTeamLeague(pair.team1)} vs ${getTeamLeague(pair.team2)}</div>
-                            </div>
-                        `).join('')}
-                        
-                        ${Array(4 - state.playoffPairs.length).fill(0).map((_, index) => {
-                            const groupIndex = state.playoffPairs.length;
-                            if (groupIndex < playoffGroups.length) {
-                                const group = playoffGroups[groupIndex];
-                                return `
-                                    <div class="draw-pair" style="opacity: 0.6; border-style: dashed;">
-                                        <div class="draw-pair-teams">
-                                            <span style="color: #94a3b8;">${group.name} bekleniyor</span>
-                                        </div>
-                                        <div class="draw-pair-league" style="font-size: 0.7rem;">
-                                            Sıra ${groupIndex === 0 ? '9-10' : groupIndex === 1 ? '11-12' : groupIndex === 2 ? '13-14' : '15-16'} vs 
-                                            Sıra ${groupIndex === 0 ? '23-24' : groupIndex === 1 ? '21-22' : groupIndex === 2 ? '19-20' : '17-18'}
-                                        </div>
-                                    </div>
-                                `;
-                            }
-                            return '';
-                        }).join('')}
-                    </div>
-            `;
-            
-            // Sadece tamamlanmamış eşleşmeler için seçim alanı
-            if (state.playoffPairs.length < 4) {
-                const currentGroup = playoffGroups[state.playoffPairs.length];
-                if (currentGroup) {
-                    const selectedTeam = state._playoffTemp?.selectedTeam;
-                    const revealedTeam = state._playoffTemp?.revealedTeam;
-                    
-                    html += `
-                        <div class="draw-selection-area">
-                            <h5>${currentGroup.name}: Sıralı Eşleşme</h5>
-                            <p style="text-align: center; margin-bottom: 1rem;">
-                                Sıra ${state.playoffPairs.length === 0 ? '9-10' : state.playoffPairs.length === 1 ? '11-12' : state.playoffPairs.length === 2 ? '13-14' : '15-16'} vs 
-                                Sıra ${state.playoffPairs.length === 0 ? '23-24' : state.playoffPairs.length === 1 ? '21-22' : state.playoffPairs.length === 2 ? '19-20' : '17-18'}
-                            </p>
-                            
-                            ${selectedTeam && !revealedTeam ? `
-                                <div class="draw-status warning">
-                                    ⚠️ Bir takım seçtiniz. Topa basarak takımı görün.
-                                    <br><small>Seçilen takım: <strong>????</strong></small>
-                                </div>
-                            ` : selectedTeam && revealedTeam ? `
-                                <div class="draw-status">
-                                    ✅ Seçilen takım: <strong>${revealedTeam}</strong> - Şimdi rakibini seçin
-                                </div>
-                            ` : `
-                                <div class="draw-status">
-                                    🎯 İlk takımı seçin (üst sıra veya alt sıra)
-                                </div>
-                            `}
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                                <div>
-                                    <h6 style="text-align: center; margin-bottom: 0.5rem;">🥇 Üst Sıra (9-16)</h6>
-                                    <div class="draw-teams-grid">
-                                        ${currentGroup.high.map((team, index) => {
-                                            if (drawn.has(team)) return '';
-                                            
-                                            // Seçili takım ise gizle
-                                            if (selectedTeam === team && !revealedTeam) {
-                                                return `
-                                                    <div class="draw-team-button selected" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; cursor: pointer;" onclick="window.footballSim.revealSelectedTeam()">
-                                                        🔒 Seçildi (Tıkla Göster)
-                                                    </div>
-                                                `;
-                                            }
-                                            
-                                            // Seçili ve gösterilmiş takım
-                                            if (selectedTeam === team && revealedTeam) {
-                                                return `
-                                                    <div class="draw-team-button selected" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
-                                                        ✅ ${team}
-                                                    </div>
-                                                `;
-                                            }
-                                            
-                                            // Seçili takım varsa ve bu rakip adayı ise
-                                            if (selectedTeam && team !== selectedTeam) {
-                                                const teamLeague = getTeamLeague(team);
-                                                const selectedLeague = getTeamLeague(selectedTeam);
-                                                const isDisabled = teamLeague === selectedLeague;
-                                                
-                                                return `
-                                                    <button class="draw-team-button ${isDisabled ? 'disabled' : ''}" 
-                                                            onclick="window.footballSim._playoffPick('${state.playoffPairs.length}', null, '${team.replace(/'/g, "\\'")}')"
-                                                            ${isDisabled ? 'disabled title="Aynı ligden takımlar eşleşemez"' : ''}>
-                                                        ${team}
-                                                        ${isDisabled ? '<span class="team-league">' + teamLeague + '</span>' : ''}
-                                                    </button>
-                                                `;
-                                            }
-                                            
-                                            // Normal seçim
-                                            return `
-                                                <button class="draw-team-button" 
-                                                        onclick="window.footballSim._playoffPick('${state.playoffPairs.length}', '${team.replace(/'/g, "\\'")}', null)">
-                                                    ${team}
-                                                </button>
-                                            `;
-                                        }).filter(Boolean).join('')}
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <h6 style="text-align: center; margin-bottom: 0.5rem;">🎯 Alt Sıra (17-24)</h6>
-                                    <div class="draw-teams-grid">
-                                        ${currentGroup.low.map((team, index) => {
-                                            if (drawn.has(team)) return '';
-                                            
-                                            // Seçili takım ise gizle
-                                            if (selectedTeam === team && !revealedTeam) {
-                                                return `
-                                                    <div class="draw-team-button selected" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; cursor: pointer;" onclick="window.footballSim.revealSelectedTeam()">
-                                                        🔒 Seçildi (Tıkla Göster)
-                                                    </div>
-                                                `;
-                                            }
-                                            
-                                            // Seçili ve gösterilmiş takım
-                                            if (selectedTeam === team && revealedTeam) {
-                                                return `
-                                                    <div class="draw-team-button selected" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
-                                                        ✅ ${team}
-                                                    </div>
-                                                `;
-                                            }
-                                            
-                                            // Seçili takım varsa ve bu rakip adayı ise
-                                            if (selectedTeam && team !== selectedTeam) {
-                                                const teamLeague = getTeamLeague(team);
-                                                const selectedLeague = getTeamLeague(selectedTeam);
-                                                const isDisabled = teamLeague === selectedLeague;
-                                                
-                                                return `
-                                                    <button class="draw-team-button ${isDisabled ? 'disabled' : ''}" 
-                                                            onclick="window.footballSim._playoffPick('${state.playoffPairs.length}', null, '${team.replace(/'/g, "\\'")}')"
-                                                            ${isDisabled ? 'disabled title="Aynı ligden takımlar eşleşemez"' : ''}>
-                                                        ${team}
-                                                        ${isDisabled ? '<span class="team-league">' + teamLeague + '</span>' : ''}
-                                                    </button>
-                                                `;
-                                            }
-                                            
-                                            // Normal seçim
-                                            return `
-                                                <button class="draw-team-button" 
-                                                        onclick="window.footballSim._playoffPick('${state.playoffPairs.length}', null, '${team.replace(/'/g, "\\'")}')">
-                                                    ${team}
-                                                </button>
-                                            `;
-                                        }).filter(Boolean).join('')}
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="draw-actions">
-                                ${selectedTeam ? `
-                                    <button class="btn btn-secondary" onclick="window.footballSim._playoffPick('${state.playoffPairs.length}', null, null)">
-                                        Seçimi İptal Et
-                                    </button>
-                                ` : ''}
+
+            html += `<div class="draw-ceremony">
+                <h4>🎯 Playoff Kura Çekimi</h4>
+                <p>Sol top = üst sıra, sağ top = alt sıra. Topa tıkla, takım açılır. İki taraftan birer top seçince eşleşme oluşur.</p>
+                <div class="draw-progress"><div class="draw-progress-fill" style="width:${gi/4*100}%"></div></div>
+
+                <div class="draw-pairs-container">
+                    ${state.playoffPairs.map(pair => `
+                        <div class="draw-pair completed">
+                            <div class="draw-pair-teams">${pair.team1} <span class="vs">vs</span> ${pair.team2}</div>
+                            <div class="draw-pair-league">${getTeamLeague(pair.team1)} — ${getTeamLeague(pair.team2)}</div>
+                        </div>`).join('')}
+                    ${gi < 4 ? pgDefs.slice(gi).map(g => `
+                        <div class="draw-pair pending">
+                            <div class="draw-pair-teams"><span>${g.label} — ${g.highRange} vs ${g.lowRange} bekleniyor</span></div>
+                        </div>`).join('') : ''}
+                </div>`;
+
+            if (currentGroup) {
+                const highTeams = currentGroup.high.filter(t => !drawn.has(t));
+                const lowTeams  = currentGroup.low.filter(t => !drawn.has(t));
+                const statusMsg = (selHigh && selLow)
+                    ? `<div class="draw-status success">✅ Eşleşme hazır: <strong>${selHigh}</strong> <span class="vs">vs</span> <strong>${selLow}</strong>
+                        <button class="btn btn-success btn-sm" onclick="window.footballSim._poConfirm()" style="margin-left:.5rem">Onayla</button>
+                        <button class="btn btn-secondary btn-sm" onclick="window.footballSim._poReset()" style="margin-left:.25rem">İptal</button>
+                       </div>`
+                    : (hidHigh || hidLow)
+                    ? `<div class="draw-status warning">⚠️ Seçilen topa tıklayarak açın</div>`
+                    : `<div class="draw-status">🎯 Sol veya sağ taraftan bir topa tıkla</div>`;
+
+                html += `<div class="draw-selection-area">
+                    <h5>${currentGroup.label}: Sıra ${currentGroup.highRange} vs ${currentGroup.lowRange}</h5>
+                    ${statusMsg}
+                    <div class="balls-arena">
+                        <div class="balls-bowl">
+                            <div class="bowl-label">🥇 Üst Sıra (${currentGroup.highRange})</div>
+                            <div class="balls-row">
+                                ${highTeams.map(t => renderBall(t,'high',selHigh,selLow,hidHigh,hidLow,getTeamLeague)).join('')}
                             </div>
                         </div>
-                    `;
-                }
+                        <div class="balls-vs">VS</div>
+                        <div class="balls-bowl">
+                            <div class="bowl-label">🎯 Alt Sıra (${currentGroup.lowRange})</div>
+                            <div class="balls-row">
+                                ${lowTeams.map(t => renderBall(t,'low',selHigh,selLow,hidHigh,hidLow,getTeamLeague)).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    ${(selHigh||selLow||hidHigh||hidLow)?`<div style="text-align:center;margin-top:.5rem"><button class="btn btn-secondary btn-sm" onclick="window.footballSim._poReset()">Seçimi Sıfırla</button></div>`:''}
+                </div>`;
+            } else {
+                html += `<div class="draw-status success" style="margin-top:1rem">🏆 Tüm eşleşmeler tamamlandı!
+                    <button class="btn btn-success" onclick="window.footballSim.finishPlayoffDraw('${comp}')" style="margin-left:.5rem">Playoff Turu Başlat</button>
+                </div>`;
             }
-            
             html += `</div>`;
         }
+
+
 
         if (state.phase === 'playoff') {
             html += `<h4>Playoff (İki maçlı)</h4>`;
@@ -1964,112 +1863,103 @@ class FootballSimulation {
         }
 
         if (state.phase === 'r16_draw') {
-            const seeded = state.r16Seeded || [];
-            const unseeded = state.r16Unseeded || [];
-            const usedS = new Set(state.r16Pairs.flatMap(p => [p.team1]));
-            const usedU = new Set(state.r16Pairs.flatMap(p => [p.team2]));
-            
-            // Takımların lig bilgilerini al
-            const getTeamLeague = (teamName) => {
-                const team = this.teams.find(t => t.name === teamName);
-                return team ? team.league : '';
+            const seeded   = (state.r16Seeded   || []).filter(Boolean);
+            const unseeded = (state.r16Unseeded  || []).filter(Boolean);
+            const usedS    = new Set(state.r16Pairs.map(p => p.team1));
+            const usedU    = new Set(state.r16Pairs.map(p => p.team2));
+            const getTeamLeague = (n) => this.teams.find(t => t.name === n)?.league || '';
+            const r16temp  = (state._r16Temp && state._r16Temp[comp]) || {};
+            const selS     = r16temp.selS  || null;  // seri başı revealed
+            const selU     = r16temp.selU  || null;  // unseeded revealed
+            const hidS     = r16temp.hidS  || null;  // seri başı hidden-selected
+            const hidU     = r16temp.hidU  || null;  // unseeded hidden-selected
+
+            const renderR16Ball = (team, side) => {
+                const isS       = side === 's';
+                const revealed  = isS ? selS : selU;
+                const hidden    = isS ? hidS : hidU;
+                const otherRev  = isS ? selU : selS;
+                const thisLig   = getTeamLeague(team);
+                const otherLig  = otherRev ? getTeamLeague(otherRev) : null;
+                const sameLeague = otherLig && otherLig === thisLig && otherLig !== '';
+                const safeTeam  = team.replace(/'/g, "\\'");
+
+                if (hidden === team) {
+                    return `<div class="lottery-ball ball-hidden" onclick="window.footballSim._r16Reveal('${side}','${comp}')">
+                        <span class="ball-icon">⚽</span><span class="ball-hint">Tıkla &amp; Aç</span>
+                    </div>`;
+                }
+                if (revealed === team) {
+                    const cls = otherRev ? 'ball-confirmed' : 'ball-revealed';
+                    return `<div class="lottery-ball ${cls}">
+                        <span class="ball-name">${team}</span><span class="ball-league">${thisLig}</span>
+                    </div>`;
+                }
+                if (sameLeague) {
+                    return `<div class="lottery-ball ball-disabled" title="Aynı lig: ${thisLig}">
+                        <span class="ball-icon">⚽</span><span class="ball-hint" style="color:#f87171;font-size:0.65rem">Aynı lig</span>
+                    </div>`;
+                }
+                return `<div class="lottery-ball ball-available" onclick="window.footballSim._r16BallSelect('${safeTeam}','${side}','${comp}')">
+                    <span class="ball-icon">⚽</span><span class="ball-hint">Seç</span>
+                </div>`;
             };
-            
-            html += `
-                <div class="draw-ceremony">
-                    <h4>🏆 Son 16 Kura Çekimi</h4>
-                    <p>Seri başı (1-8) ve playoff kazananları eşleşiyor (aynı ligden takımlar eşleşemez)</p>
-                    
-                    <div class="draw-progress">
-                        <div class="draw-progress-fill" style="width: ${(state.r16Pairs.length / 8 * 100)}%"></div>
-                    </div>
-                    
-                    <div class="draw-pairs-container">
-                        ${state.r16Pairs.map(pair => `
-                            <div class="draw-pair">
-                                <div class="draw-pair-teams">
-                                    ${pair.team1} <span class="vs">vs</span> ${pair.team2}
-                                </div>
-                                <div class="draw-pair-league">${getTeamLeague(pair.team1)} vs ${getTeamLeague(pair.team2)}</div>
-                            </div>
-                        `).join('')}
-                        
-                        ${Array(8 - state.r16Pairs.length).fill(0).map((_, index) => `
-                            <div class="draw-pair" style="opacity: 0.6; border-style: dashed;">
-                                <div class="draw-pair-teams">
-                                    <span style="color: #94a3b8;">Eşleşme ${state.r16Pairs.length + index + 1} bekleniyor</span>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                    
-                    <div class="draw-selection-area">
-                        <h5>Sıra ${state.r16Pairs.length + 1}. Eşleşme İçin Takım Seçimi</h5>
-                        ${state._r16Temp && state._r16Temp[comp] ? `
-                            <div class="draw-status">
-                                Seçilen takım: <strong>${state._r16Temp[comp].seeded != null ? seeded[state._r16Temp[comp].seeded] : unseeded[state._r16Temp[comp].unseeded]}</strong> - Şimdi rakibini seçin
-                            </div>
-                        ` : ''}
-                        
-                        <div class="r16-draw-wrap">
-                            <div class="bowl">
-                                <strong>🥇 Seri Başları (1-8)</strong>
-                                <div class="draw-teams-grid">
-                                    ${seeded.map((t, i) => {
-                                        if (!t || usedS.has(t)) return '';
-                                        
-                                        const teamLeague = getTeamLeague(t);
-                                        const selectedUnseed = state._r16Temp && state._r16Temp[comp] && state._r16Temp[comp].unseeded != null ? unseeded[state._r16Temp[comp].unseeded] : null;
-                                        const selectedLeague = selectedUnseed ? getTeamLeague(selectedUnseed) : '';
-                                        const isDisabled = selectedUnseed && teamLeague === selectedLeague;
-                                        
-                                        return `
-                                            <button class="draw-team-button ${state._r16Temp && state._r16Temp[comp] && state._r16Temp[comp].seeded === i ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}" 
-                                                    onclick="window.footballSim._r16Pick('${comp}', 's', ${i})"
-                                                    ${isDisabled ? 'disabled title="Aynı ligden takımlar eşleşemez"' : ''}>
-                                                ${t}
-                                                ${isDisabled ? '<span class="team-league">' + teamLeague + '</span>' : ''}
-                                            </button>
-                                        `;
-                                    }).filter(Boolean).join('')}
-                                </div>
-                            </div>
-                            
-                            <div class="bowl">
-                                <strong>🎯 Playoff Kazananları</strong>
-                                <div class="draw-teams-grid">
-                                    ${unseeded.map((t, i) => {
-                                        if (!t || usedU.has(t)) return '';
-                                        
-                                        const teamLeague = getTeamLeague(t);
-                                        const selectedSeed = state._r16Temp && state._r16Temp[comp] && state._r16Temp[comp].seeded != null ? seeded[state._r16Temp[comp].seeded] : null;
-                                        const selectedLeague = selectedSeed ? getTeamLeague(selectedSeed) : '';
-                                        const isDisabled = selectedSeed && teamLeague === selectedLeague;
-                                        
-                                        return `
-                                            <button class="draw-team-button ${state._r16Temp && state._r16Temp[comp] && state._r16Temp[comp].unseeded === i ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}" 
-                                                    onclick="window.footballSim._r16Pick('${comp}', 'u', ${i})"
-                                                    ${isDisabled ? 'disabled title="Aynı ligden takımlar eşleşemez"' : ''}>
-                                                ${t}
-                                                ${isDisabled ? '<span class="team-league">' + teamLeague + '</span>' : ''}
-                                            </button>
-                                        `;
-                                    }).filter(Boolean).join('')}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="draw-actions">
-                            ${state._r16Temp && state._r16Temp[comp] ? `
-                                <button class="btn btn-secondary" onclick="window.footballSim._r16Pick('${comp}', null, null)">
-                                    Seçimi İptal Et
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
+
+            const availableS = seeded.filter(t => !usedS.has(t));
+            const availableU = unseeded.filter(t => !usedU.has(t));
+
+            const statusMsg = (selS && selU)
+                ? `<div class="draw-status success">✅ Eşleşme hazır: <strong>${selS}</strong> <span class="vs">vs</span> <strong>${selU}</strong>
+                    <button class="btn btn-success btn-sm" onclick="window.footballSim._r16BallConfirm('${comp}')" style="margin-left:.5rem">Onayla</button>
+                    <button class="btn btn-secondary btn-sm" onclick="window.footballSim._r16BallReset('${comp}')" style="margin-left:.25rem">İptal</button>
+                   </div>`
+                : (hidS || hidU)
+                ? `<div class="draw-status warning">⚠️ Seçilen topa tıklayarak açın</div>`
+                : `<div class="draw-status">🎯 Sol (seri başı) veya sağ (playoff kazananı) taraftan bir topa tıkla</div>`;
+
+            html += `<div class="draw-ceremony">
+                <h4>🏆 Son 16 Kura Çekimi</h4>
+                <p>Seri başları (1-8) sol, playoff kazananları sağ. Topa tıkla aç, soldan 1 + sağdan 1 eşleşir. Aynı ligden takımlar eşleşemez.</p>
+                <div class="draw-progress"><div class="draw-progress-fill" style="width:${state.r16Pairs.length/8*100}%"></div></div>
+
+                <div class="draw-pairs-container">
+                    ${state.r16Pairs.map(pair => `
+                        <div class="draw-pair completed">
+                            <div class="draw-pair-teams">${pair.team1} <span class="vs">vs</span> ${pair.team2}</div>
+                            <div class="draw-pair-league">${getTeamLeague(pair.team1)} — ${getTeamLeague(pair.team2)}</div>
+                        </div>`).join('')}
+                    ${Array(8 - state.r16Pairs.length).fill(0).map((_,i) => `
+                        <div class="draw-pair pending">
+                            <div class="draw-pair-teams"><span>Eşleşme ${state.r16Pairs.length + i + 1} bekleniyor</span></div>
+                        </div>`).join('')}
                 </div>
-            `;
+
+                ${availableS.length > 0 ? `
+                <div class="draw-selection-area">
+                    <h5>Sıra ${state.r16Pairs.length + 1}. Eşleşme</h5>
+                    ${statusMsg}
+                    <div class="balls-arena">
+                        <div class="balls-bowl">
+                            <div class="bowl-label">🥇 Seri Başları (1-8)</div>
+                            <div class="balls-row">
+                                ${availableS.map(t => renderR16Ball(t,'s')).join('')}
+                            </div>
+                        </div>
+                        <div class="balls-vs">VS</div>
+                        <div class="balls-bowl">
+                            <div class="bowl-label">🎯 Playoff Kazananları</div>
+                            <div class="balls-row">
+                                ${availableU.map(t => renderR16Ball(t,'u')).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    ${(selS||selU||hidS||hidU)?`<div style="text-align:center;margin-top:.5rem"><button class="btn btn-secondary btn-sm" onclick="window.footballSim._r16BallReset('${comp}')">Seçimi Sıfırla</button></div>`:''}
+                </div>` : `<div class="draw-status success" style="margin-top:1rem">🏆 Son 16 kura tamamlandı!
+                    <button class="btn btn-success" onclick="window.footballSim.finishR16Draw('${comp}')" style="margin-left:.5rem">Son 16 Başlat</button>
+                </div>`}
+            </div>`;
         }
+
 
         if (state.phase === 'r16') {
             html += `<h4>Son 16</h4><p>Kura tamamlandı. Maç simülasyonu bu aşamada eklenebilir.</p>`;
@@ -2343,17 +2233,164 @@ class FootballSimulation {
         // Drag-drop kaldırıldı, tıkla-tıkla swap sistemi kullanılıyor
     }
 
-    // Seçili takımı göster
+    // ─── PLAYOFF KURA TOP SİSTEMİ ───────────────────────────────────────────
+
+    // Bir top seçildi (henüz gizli)
+    _poSelect(teamName, side) {
+        const comp  = this.getCurrentEuropeanCompetition() || 'ucl';
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
+        if (!state._playoffTemp) state._playoffTemp = {};
+        const t = state._playoffTemp;
+        // Sadece ilgili tarafı kaydet, zaten açılmış tarafın seçimini bozma
+        if (side === 'high') {
+            if (t.selHigh) return; // zaten açık, tekrar seçme
+            t.hidHigh = teamName;
+            t.selHigh = null;
+        } else {
+            if (t.selLow) return;
+            t.hidLow = teamName;
+            t.selLow = null;
+        }
+        this.saveData();
+        this.showEuropeanCompetition(comp);
+    }
+
+    // Gizli topa tıklandı → aç
+    _poReveal(side) {
+        const comp  = this.getCurrentEuropeanCompetition() || 'ucl';
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
+        if (!state._playoffTemp) state._playoffTemp = {};
+        const t = state._playoffTemp;
+        if (side === 'high' && t.hidHigh) {
+            t.selHigh = t.hidHigh;
+            t.hidHigh = null;
+        } else if (side === 'low' && t.hidLow) {
+            t.selLow  = t.hidLow;
+            t.hidLow  = null;
+        }
+        // Her iki taraf da açıldıysa → aynı lig kontrol
+        if (t.selHigh && t.selLow) {
+            const lgH = this.teams.find(x => x.name === t.selHigh)?.league || '';
+            const lgL = this.teams.find(x => x.name === t.selLow)?.league  || '';
+            if (lgH && lgL && lgH === lgL) {
+                alert(`Aynı ligden takımlar eşleşemez! (${lgH})\nBir seçimi sıfırlayın.`);
+                // Sadece yeni açılanı temizle
+                if (side === 'high') { t.selHigh = null; }
+                else                 { t.selLow  = null; }
+            }
+        }
+        this.saveData();
+        this.showEuropeanCompetition(comp);
+    }
+
+    // Eşleşmeyi onayla
+    _poConfirm() {
+        const comp  = this.getCurrentEuropeanCompetition() || 'ucl';
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
+        const t = state._playoffTemp || {};
+        if (!t.selHigh || !t.selLow) return;
+        const lgH = this.teams.find(x => x.name === t.selHigh)?.league || '';
+        const lgL = this.teams.find(x => x.name === t.selLow)?.league  || '';
+        if (lgH && lgL && lgH === lgL) {
+            alert(`Aynı ligden takımlar eşleşemez! (${lgH})`);
+            return;
+        }
+        if (!state.playoffPairs) state.playoffPairs = [];
+        state.playoffPairs.push({ team1: t.selHigh, team2: t.selLow });
+        state._playoffTemp = {};
+        this.saveData();
+        this.addActivity(`Playoff eşleşme: ${t.selHigh} vs ${t.selLow}`);
+        this.showEuropeanCompetition(comp);
+    }
+
+    // Seçimi sıfırla
+    _poReset() {
+        const comp  = this.getCurrentEuropeanCompetition() || 'ucl';
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
+        state._playoffTemp = {};
+        this.saveData();
+        this.showEuropeanCompetition(comp);
+    }
+
+    // ─── SON 16 KURA TOP SİSTEMİ ────────────────────────────────────────────
+
+    _r16BallSelect(teamName, side, comp) {
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
+        if (!state._r16Temp) state._r16Temp = {};
+        if (!state._r16Temp[comp]) state._r16Temp[comp] = {};
+        const t = state._r16Temp[comp];
+        if (side === 's') {
+            if (t.selS) return;
+            t.hidS = teamName; t.selS = null;
+        } else {
+            if (t.selU) return;
+            t.hidU = teamName; t.selU = null;
+        }
+        this.saveData();
+        this.showEuropeanCompetition(comp);
+    }
+
+    _r16Reveal(side, comp) {
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
+        if (!state._r16Temp) state._r16Temp = {};
+        if (!state._r16Temp[comp]) state._r16Temp[comp] = {};
+        const t = state._r16Temp[comp];
+        if (side === 's' && t.hidS) { t.selS = t.hidS; t.hidS = null; }
+        if (side === 'u' && t.hidU) { t.selU = t.hidU; t.hidU = null; }
+        if (t.selS && t.selU) {
+            const lgS = this.teams.find(x => x.name === t.selS)?.league || '';
+            const lgU = this.teams.find(x => x.name === t.selU)?.league || '';
+            if (lgS && lgU && lgS === lgU) {
+                alert(`Aynı ligden takımlar eşleşemez! (${lgS})\nBir seçimi sıfırlayın.`);
+                if (side === 's') { t.selS = null; } else { t.selU = null; }
+            }
+        }
+        this.saveData();
+        this.showEuropeanCompetition(comp);
+    }
+
+    _r16BallConfirm(comp) {
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
+        const t = (state._r16Temp && state._r16Temp[comp]) || {};
+        if (!t.selS || !t.selU) return;
+        const lgS = this.teams.find(x => x.name === t.selS)?.league || '';
+        const lgU = this.teams.find(x => x.name === t.selU)?.league || '';
+        if (lgS && lgU && lgS === lgU) { alert(`Aynı ligden takımlar eşleşemez! (${lgS})`); return; }
+
+        // r16Seeded ve r16Unseeded dizilerinde null yap
+        const si = state.r16Seeded.indexOf(t.selS);
+        const ui = state.r16Unseeded.indexOf(t.selU);
+        if (si !== -1) state.r16Seeded[si]   = null;
+        if (ui !== -1) state.r16Unseeded[ui]  = null;
+
+        state.r16Pairs.push({ team1: t.selS, team2: t.selU });
+        state._r16Temp[comp] = {};
+        this.saveData();
+        this.addActivity(`Son 16 eşleşme: ${t.selS} vs ${t.selU}`);
+        this.showEuropeanCompetition(comp);
+    }
+
+    _r16BallReset(comp) {
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
+        if (state._r16Temp) state._r16Temp[comp] = {};
+        this.saveData();
+        this.showEuropeanCompetition(comp);
+    }
+
+
+    // Seçili takımı göster — aktif kupaya göre çalışır
     revealSelectedTeam() {
-        const state = this.getEuropeanPlayableState('UCL');
+        const comp = this.getCurrentEuropeanCompetition() || 'ucl';
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
         if (state._playoffTemp && state._playoffTemp.selectedTeam) {
             state._playoffTemp.revealedTeam = state._playoffTemp.selectedTeam;
-            this.showEuropeanCompetition('ucl');
+            this.showEuropeanCompetition(comp);
         }
     }
 
     _playoffPick(groupIndex, teamA, teamB) {
-        const state = this.getEuropeanPlayableState('UCL'); // Tüm kupalar aynı state'i kullanıyor
+        const comp = this.getCurrentEuropeanCompetition() || 'ucl';
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
         
         if (!state._playoffTemp) state._playoffTemp = {};
         
@@ -2361,8 +2398,9 @@ class FootballSimulation {
             // İlk takım seçimi - gizli yap
             state._playoffTemp.selectedTeam = teamA;
             state._playoffTemp.currentGroup = groupIndex;
-            state._playoffTemp.revealedTeam = null; // Yeni seçimde revealed sıfırla
-            this.showEuropeanCompetition('ucl');
+            state._playoffTemp.revealedTeam = null;
+            this.saveData();
+            this.showEuropeanCompetition(comp);
             return;
         }
         
@@ -2376,39 +2414,47 @@ class FootballSimulation {
             const leagueA = getTeamLeague(teamA);
             const leagueB = getTeamLeague(teamB);
             
-            if (leagueA === leagueB) {
-                alert('Aynı ligden takımlar eşleşemez! Otomatik olarak başka takımlar eşleştiriliyor.');
-                this.autoPlayoffPairing(groupIndex);
+            if (leagueA && leagueB && leagueA === leagueB) {
+                alert(`Aynı ligden takımlar eşleşemez! (${leagueA})\nBaşka bir takım seçin.`);
+                // Seçimi temizle, kullanıcı tekrar seçsin
+                state._playoffTemp.selectedTeam = null;
+                state._playoffTemp.currentGroup = null;
+                state._playoffTemp.revealedTeam = null;
+                this.saveData();
+                this.showEuropeanCompetition(comp);
                 return;
             }
             
-            // Eşleşmeyi kaydet
             if (!state.playoffPairs) state.playoffPairs = [];
             state.playoffPairs.push({ team1: teamA, team2: teamB });
             state._playoffTemp.selectedTeam = null;
             state._playoffTemp.currentGroup = null;
+            state._playoffTemp.revealedTeam = null;
             
             this.saveData();
-            this.showEuropeanCompetition('ucl');
+            this.showEuropeanCompetition(comp);
             return;
         }
         
         // İptal
         state._playoffTemp.selectedTeam = null;
         state._playoffTemp.currentGroup = null;
-        this.showEuropeanCompetition('ucl');
+        state._playoffTemp.revealedTeam = null;
+        this.saveData();
+        this.showEuropeanCompetition(comp);
     }
 
-    // Otomatik playoff eşleştirme (aynı ligden takımlar varsa)
-    autoPlayoffPairing(groupIndex) {
-        const state = this.getEuropeanPlayableState('UCL');
+    // Otomatik playoff eşleştirme (aynı ligden takımlar varsa, comp-generic)
+    autoPlayoffPairing(groupIndex, comp) {
+        const activeComp = comp || this.getCurrentEuropeanCompetition() || 'ucl';
+        const state = this.getEuropeanPlayableState(activeComp.toUpperCase());
         const st = state.standingsOrder || [];
         
         const playoffGroups = [
-            { high: st.slice(8, 10), low: st.slice(22, 24) }, // 9-10 vs 23-24
-            { high: st.slice(10, 12), low: st.slice(20, 22) }, // 11-12 vs 21-22
-            { high: st.slice(12, 14), low: st.slice(18, 20) }, // 13-14 vs 19-20
-            { high: st.slice(14, 16), low: st.slice(16, 18) }  // 15-16 vs 17-18
+            { high: st.slice(8, 10),  low: st.slice(22, 24) },
+            { high: st.slice(10, 12), low: st.slice(20, 22) },
+            { high: st.slice(12, 14), low: st.slice(18, 20) },
+            { high: st.slice(14, 16), low: st.slice(16, 18) }
         ];
         
         const drawn = new Set(state.playoffPairs.flatMap(p => [p.team1, p.team2]));
@@ -2418,41 +2464,66 @@ class FootballSimulation {
         };
         
         const currentGroup = playoffGroups[groupIndex];
+        if (!currentGroup) { alert('Geçersiz grup!'); return; }
         const availableHigh = currentGroup.high.filter(t => !drawn.has(t));
-        const availableLow = currentGroup.low.filter(t => !drawn.has(t));
+        const availableLow  = currentGroup.low.filter(t => !drawn.has(t));
         
-        // Aynı ligden takımları engelleyerek otomatik eşleştir
         for (let highTeam of availableHigh) {
             const highLeague = getTeamLeague(highTeam);
             for (let lowTeam of availableLow) {
                 const lowLeague = getTeamLeague(lowTeam);
-                
-                if (highLeague !== lowLeague) {
-                    // Eşleşmeyi kaydet
+                if (!highLeague || !lowLeague || highLeague !== lowLeague) {
                     state.playoffPairs.push({ team1: highTeam, team2: lowTeam });
+                    if (!state._playoffTemp) state._playoffTemp = {};
                     state._playoffTemp.selectedTeam = null;
                     state._playoffTemp.currentGroup = null;
-                    
+                    state._playoffTemp.revealedTeam = null;
                     this.saveData();
-                    this.showEuropeanCompetition('ucl');
+                    this.showEuropeanCompetition(activeComp);
                     return;
                 }
             }
         }
         
-        alert('Bu grup için uygun eşleşme bulunamadı!');
+        alert('Bu grup için uygun eşleşme bulunamadı! (Tüm takımlar aynı ligden olabilir)');
     }
 
     _r16Pick(comp, which, index) {
         const state = this.getEuropeanPlayableState(comp.toUpperCase());
         if (!state._r16Temp) state._r16Temp = {};
-        if (which === 's') state._r16Temp[comp] = { seeded: index, unseeded: state._r16Temp[comp]?.unseeded };
-        if (which === 'u') state._r16Temp[comp] = { seeded: state._r16Temp[comp]?.seeded, unseeded: index };
+
+        // null/null = iptal
+        if (which === null) {
+            state._r16Temp[comp] = null;
+            this.saveData();
+            this.showEuropeanCompetition(comp);
+            return;
+        }
+
+        if (which === 's') state._r16Temp[comp] = { seeded: index, unseeded: state._r16Temp[comp]?.unseeded ?? null };
+        if (which === 'u') state._r16Temp[comp] = { seeded: state._r16Temp[comp]?.seeded ?? null, unseeded: index };
+
         const t = state._r16Temp[comp];
         if (t && t.seeded != null && t.unseeded != null) {
+            const seededName   = state.r16Seeded[t.seeded];
+            const unseededName = state.r16Unseeded[t.unseeded];
+            const leagueS = this.teams.find(x => x.name === seededName)?.league  || '';
+            const leagueU = this.teams.find(x => x.name === unseededName)?.league || '';
+
+            if (leagueS && leagueU && leagueS === leagueU) {
+                alert(`Aynı ligden takımlar eşleşemez! (${leagueS})\nBaşka bir takım seçin.`);
+                // Sadece en son seçilen tarafı temizle, diğerini koru
+                if (which === 's') state._r16Temp[comp] = { seeded: null, unseeded: t.unseeded };
+                else               state._r16Temp[comp] = { seeded: t.seeded, unseeded: null };
+                this.saveData();
+                this.showEuropeanCompetition(comp);
+                return;
+            }
+
             this.drawR16Pair(comp, t.seeded, t.unseeded);
             state._r16Temp[comp] = null;
         }
+        this.saveData();
         this.showEuropeanCompetition(comp);
     }
 
@@ -2499,16 +2570,26 @@ class FootballSimulation {
 
     buildEuropeanGroupFixtures(state) {
         // state.pots: { 1:[9 isim], 2:[9 isim], 3:[9 isim], 4:[9 isim] }
-        // Torba sırasına göre 36 takım listesi oluştur
         const allNames = [
             ...state.pots[1], ...state.pots[2],
             ...state.pots[3], ...state.pots[4]
         ];
 
+        // Takım adından lig bilgisini al
+        const getLeague = (name) => {
+            const p = (state.participants || []).find(t => t.name === name);
+            if (p && p.league) return p.league;
+            const t = this.teams.find(t => t.name === name);
+            return t ? t.league : '';
+        };
+
         // ── Berger Table Round Robin (8 tur, her tur 18 maç) ─────────────
         // n=36 takım, sabit T0, diğerleri döner
         // Her turda 18 benzersiz eşleşme, her takım her turda tam 1 maç
         // 8 turda her takım tam 8 farklı rakiple oynuyor (tekrar yok)
+        // KURAL: aynı ligden iki takım aynı maç gününde eşleşemez.
+        // Eğer Berger Table'dan gelen çiftte aynı lig çakışması varsa,
+        // o tur içinde çakışmayan başka bir çiftle swap yapılır.
         const n = allNames.length; // 36
         const circle = [...allNames.slice(1)]; // 35 eleman, dönen daire
         const ROUNDS = 8;
@@ -2518,32 +2599,86 @@ class FootballSimulation {
         for (let r = 0; r < ROUNDS; r++) {
             const matchday = r + 1;
 
-            // Sabit takım (index 0) vs dairenin r. elemanı
+            // Ham Berger çiftlerini üret
+            const rawPairs = [];
             const fixed = allNames[0];
             const opp   = circle[r % circle.length];
-            fixtures.push({
-                homeTeam:  r % 2 === 0 ? fixed : opp,
-                awayTeam:  r % 2 === 0 ? opp   : fixed,
-                homeGoals: null,
-                awayGoals: null,
-                matchday
-            });
+            rawPairs.push([fixed, opp]);
 
-            // Kalan 17 çift: simetrik eşleşme
             for (let i = 1; i <= 17; i++) {
-                const a = circle[(r + i)           % 35];
-                const b = circle[(r - i + 35 * 3)  % 35];
+                const a = circle[(r + i)          % 35];
+                const b = circle[(r - i + 35 * 3) % 35];
+                rawPairs.push([a, b]);
+            }
+
+            // Aynı lig çakışmalarını tespit et ve swap ile gider
+            // Her çift: [home, away] — ligler çakışıyorsa bu turdaki başka bir çiftle swap dene
+            const resolvedPairs = this._resolveLeagueConflicts(rawPairs, getLeague);
+
+            // Fixtures dizisine ekle (ev/deplasman: tur çift → normal, tur tek → ters)
+            resolvedPairs.forEach((pair, i) => {
+                const flip = (r + i) % 2 === 1;
                 fixtures.push({
-                    homeTeam:  i % 2 === 0 ? a : b,
-                    awayTeam:  i % 2 === 0 ? b : a,
+                    homeTeam:  flip ? pair[1] : pair[0],
+                    awayTeam:  flip ? pair[0] : pair[1],
                     homeGoals: null,
                     awayGoals: null,
                     matchday
                 });
-            }
+            });
         }
 
         return fixtures;
+    }
+
+    // Bir turdaki çiftlerde aynı lig çakışması varsa swap ile çöz
+    _resolveLeagueConflicts(pairs, getLeague) {
+        const result = pairs.map(p => [...p]); // derin kopya
+        const MAX_PASSES = 50;
+
+        for (let pass = 0; pass < MAX_PASSES; pass++) {
+            let changed = false;
+
+            for (let i = 0; i < result.length; i++) {
+                const [a, b] = result[i];
+                if (getLeague(a) !== getLeague(b)) continue; // çakışma yok
+
+                // Çakışma var — başka bir çift j ile swap dene
+                let swapped = false;
+                for (let j = i + 1; j < result.length; j++) {
+                    const [c, d] = result[j];
+
+                    // Seçenek 1: a-c / b-d swap (i'nin away ile j'nin home)
+                    // i → [a, d], j → [c, b]
+                    if (getLeague(a) !== getLeague(d) && getLeague(c) !== getLeague(b)) {
+                        result[i] = [a, d];
+                        result[j] = [c, b];
+                        swapped = true;
+                        changed = true;
+                        break;
+                    }
+                    // Seçenek 2: a-d / c-b  (j'nin home ile swap)
+                    // i → [a, c], j → [d, b]  — burada d away'e geçiyor
+                    if (getLeague(a) !== getLeague(c) && getLeague(d) !== getLeague(b)) {
+                        result[i] = [a, c];
+                        result[j] = [d, b];
+                        swapped = true;
+                        changed = true;
+                        break;
+                    }
+                }
+
+                if (!swapped) {
+                    // Swap bulunamadı — zorunlu çakışma, olduğu gibi bırak
+                    // (örneğin bir torbada aynı ligden 5+ takım varsa kaçınılmaz)
+                    console.warn(`[EuropeanDraw] Kaçınılmaz çakışma: ${a} vs ${b} (${getLeague(a)})`);
+                }
+            }
+
+            if (!changed) break; // daha fazla çakışma kalmadı
+        }
+
+        return result;
     }
 
     getEuropeanGroupStandings(comp) {
@@ -2625,9 +2760,9 @@ class FootballSimulation {
         if (pi < 0 || pi > 3) return;
         const high = groups[pi], low = groups[pairOpponent[pi]];
         if (!high || !low || !high.includes(teamA) || !low.includes(teamB)) return;
-        const country1 = this.teams.find(t => t.name === teamA)?.country || this.leagueToCountry[this.teams.find(t => t.name === teamA)?.league];
-        const country2 = this.teams.find(t => t.name === teamB)?.country || this.leagueToCountry[this.teams.find(t => t.name === teamB)?.league];
-        if (country1 === country2) { alert('Aynı ülke eşleşemez.'); return; }
+        const league1 = this.teams.find(t => t.name === teamA)?.league || '';
+        const league2 = this.teams.find(t => t.name === teamB)?.league || '';
+        if (league1 && league2 && league1 === league2) { alert(`Aynı ligden takımlar eşleşemez! (${league1})`); return; }
         if (state.playoffPairs.some(p => p.team1 === teamA || p.team2 === teamA || p.team1 === teamB || p.team2 === teamB)) return;
         state.playoffPairs.push({ team1: teamA, team2: teamB });
         this.saveData();
@@ -2683,9 +2818,12 @@ class FootballSimulation {
         const s = state.r16Seeded[seededIdx];
         const u = state.r16Unseeded[unseededIdx];
         if (!s || !u) return;
-        const countryS = this.teams.find(t => t.name === s)?.country;
-        const countryU = this.teams.find(t => t.name === u)?.country;
-        if (countryS === countryU) return;
+        const leagueS = this.teams.find(t => t.name === s)?.league || '';
+        const leagueU = this.teams.find(t => t.name === u)?.league || '';
+        if (leagueS && leagueU && leagueS === leagueU) {
+            alert(`Aynı ligden takımlar eşleşemez! (${leagueS})`);
+            return;
+        }
         state.r16Pairs.push({ team1: s, team2: u });
         state.r16Seeded[seededIdx] = null;
         state.r16Unseeded[unseededIdx] = null;
