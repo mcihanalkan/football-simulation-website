@@ -1638,128 +1638,106 @@ class FootballSimulation {
             const totalPlayed = state.groupMatches.filter(m => m.homeGoals != null).length;
             const totalMatches = state.groupMatches.length;
             const allPlayed = totalPlayed >= totalMatches;
-            
+            const maxMatchday = totalMatches > 0
+                ? Math.max(...state.groupMatches.map(m => m.matchday || 0), 8)
+                : 8;
+
+            html += `<div class="european-match-container">`;
+
+            // Sol: Maç günleri
             html += `
-                <div class="european-match-container">
-                    <div class="european-matches-section">
-                        <h4>🏆 Grup Maçları</h4>
-                        <div class="match-progress-info">
-                            <p>Maç Durumu: ${totalPlayed}/${totalMatches} (${Math.round(totalPlayed/totalMatches*100)}%)</p>
-                            <div class="draw-progress">
-                                <div class="draw-progress-fill" style="width: ${(totalPlayed/totalMatches*100)}%"></div>
-                            </div>
-                        </div>
-            `;
-            
-            // Maç günlerini göster (9 maç günü)
-            const maxMatchday = Math.max(...state.groupMatches.map(m => m.matchday), 9);
-            for (let md = 1; md <= maxMatchday; md++) {
-                const matches = state.groupMatches.filter(m => m.matchday === md);
-                const played = matches.filter(m => m.homeGoals != null).length;
-                
-                // Gruplara göre maçları ayır
-                const groupMatches = { 1: [], 2: [], 3: [], 4: [] };
-                matches.forEach(m => {
-                    if (groupMatches[m.group]) {
-                        groupMatches[m.group].push(m);
-                    }
-                });
-                
-                html += `
-                    <div class="european-matchday-block">
-                        <h5>${md}. Maç Günü (${played}/${matches.length} maç oynandı)</h5>
-                        ${played < matches.length ? `<button class="btn btn-xs btn-primary mb-2" onclick="window.footballSim.simulateEuropeanMatchday('${comp}', ${md});">Bu günü simüle et</button>` : ''}
-                        
-                        <div class="groups-grid">
-                            ${Object.entries(groupMatches).map(([groupNum, groupMatches]) => `
-                                <div class="group-section">
-                                    <h6>🏆 Grup ${groupNum}</h6>
-                                    <ul class="european-fixtures-list">
-                                        ${groupMatches.map(m => {
-                                            const score = m.homeGoals != null ? `<span class="european-match-score">${m.homeGoals}-${m.awayGoals}</span>` : '';
-                                            const btn = m.homeGoals == null ? `<button class="btn btn-xs btn-primary" onclick="window.footballSim.simulateEuropeanGroupMatch('${comp}', '${m.homeTeam.replace(/'/g, "\\'")}', '${m.awayTeam.replace(/'/g, "\\'")}', ${md});">Simüle et</button>` : '';
-                                            return `
-                                                <li>
-                                                    <div class="european-match-teams">
-                                                        ${m.homeTeam} - ${m.awayTeam} ${score}
-                                                    </div>
-                                                    <div class="european-match-actions">
-                                                        ${btn}
-                                                    </div>
-                                                </li>
-                                            `;
-                                        }).join('')}
-                                    </ul>
-                                </div>
-                            `).join('')}
+                <div class="european-matches-section">
+                    <h4>📅 Lig Fazı Maçları</h4>
+                    <div class="match-progress-info">
+                        <p>${totalPlayed}/${totalMatches} maç oynandı</p>
+                        <div class="draw-progress">
+                            <div class="draw-progress-fill" style="width:${totalMatches ? Math.round(totalPlayed/totalMatches*100) : 0}%"></div>
                         </div>
                     </div>
-                `;
+            `;
+
+            for (let md = 1; md <= maxMatchday; md++) {
+                const dayMatches = state.groupMatches.filter(m => m.matchday === md);
+                if (dayMatches.length === 0) continue;
+                const dayPlayed = dayMatches.filter(m => m.homeGoals != null).length;
+                const dayDone = dayPlayed === dayMatches.length;
+
+                html += `
+                    <div class="european-matchday-block">
+                        <div class="matchday-header">
+                            <span class="matchday-title">${md}. Maç Günü</span>
+                            <span class="matchday-progress">${dayPlayed}/${dayMatches.length}</span>
+                            ${!dayDone ? `<button class="btn btn-xs btn-primary" onclick="window.footballSim.simulateEuropeanMatchday('${comp}',${md})">Tümünü Simüle Et</button>` : '<span class="matchday-done">✓</span>'}
+                        </div>
+                        <ul class="european-fixtures-list">
+                            ${dayMatches.map(m => {
+                                const scored = m.homeGoals != null;
+                                const score = scored
+                                    ? `<span class="european-match-score">${m.homeGoals}-${m.awayGoals}</span>`
+                                    : `<span class="european-match-score unplayed">vs</span>`;
+                                const btn = !scored
+                                    ? `<button class="btn btn-xs btn-success" onclick="window.footballSim.simulateEuropeanGroupMatch('${comp}','${m.homeTeam.replace(/'/g,"\\'")}','${m.awayTeam.replace(/'/g,"\\'")}',${md})">▶</button>`
+                                    : '';
+                                return `
+                                    <li class="${scored ? 'played' : ''}">
+                                        <span class="match-team home">${m.homeTeam}</span>
+                                        ${score}
+                                        <span class="match-team away">${m.awayTeam}</span>
+                                        ${btn}
+                                    </li>`;
+                            }).join('')}
+                        </ul>
+                    </div>`;
             }
-            
-            html += `</div>`;
-            
-            // Anlık puan durumu paneli (36 takım genel sıralama)
+
+            html += `</div>`; // european-matches-section
+
+            // Sağ: Puan durumu
             html += `
                 <div class="european-live-standings">
-                    <h4>🏆 Genel Puan Durumu (36 Takım)</h4>
+                    <h4>📊 Puan Durumu</h4>
                     <div class="european-standings-table-wrap">
                         <table class="european-standings-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Takım</th>
-                                    <th>O</th>
-                                    <th>G</th>
-                                    <th>B</th>
-                                    <th>M</th>
-                                    <th>A</th>
-                                    <th>P</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>#</th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>A</th><th>P</th></tr></thead>
                             <tbody>
-            `;
-            
-            standings.forEach((s, i) => {
-                const pos = i + 1;
-                let positionClass = '';
-                if (pos >= 1 && pos <= 9) positionClass = 'standing-position-1-9'; // Grup 1. ve 2.
-                else if (pos >= 10 && pos <= 18) positionClass = 'standing-position-10-18'; // Grup 3. ve 4.
-                else if (pos >= 19 && pos <= 27) positionClass = 'standing-position-19-27'; // Grup 5. ve 6.
-                else if (pos >= 28 && pos <= 36) positionClass = 'standing-position-28-36'; // Grup 7. ve 8.
-                
-                html += `
-                    <tr class="${positionClass}">
-                        <td><strong>${pos}</strong></td>
-                        <td>${s.name}</td>
-                        <td>${s.played}</td>
-                        <td>${s.won}</td>
-                        <td>${s.drawn}</td>
-                        <td>${s.lost}</td>
-                        <td>${s.goalsFor}-${s.goalsAgainst}</td>
-                        <td><strong>${s.points}</strong></td>
-                    </tr>
-                `;
-            });
-            
-            html += `
+                                ${standings.map((s, i) => {
+                                    const pos = i + 1;
+                                    let cls = '';
+                                    if (pos <= 8)       cls = 'standing-position-1-8';
+                                    else if (pos <= 16) cls = 'standing-position-9-16';
+                                    else if (pos <= 24) cls = 'standing-position-17-24';
+                                    else                cls = 'standing-position-25-36';
+                                    return `<tr class="${cls}">
+                                        <td><strong>${pos}</strong></td>
+                                        <td>${s.name}</td>
+                                        <td>${s.played}</td><td>${s.won}</td><td>${s.drawn}</td><td>${s.lost}</td>
+                                        <td>${s.goalsFor}-${s.goalsAgainst}</td>
+                                        <td><strong>${s.points}</strong></td>
+                                    </tr>`;
+                                }).join('')}
                             </tbody>
                         </table>
                     </div>
+                    <div class="standings-legend">
+                        <span class="legend-item standing-position-1-8">1-8: Direkt Son 16</span>
+                        <span class="legend-item standing-position-9-16">9-16: Playoff</span>
+                        <span class="legend-item standing-position-17-24">17-24: Playoff (Eleme)</span>
+                        <span class="legend-item standing-position-25-36">25-36: Elendi</span>
+                    </div>
                 </div>
-            </div>
-            `;
-            
-            // Tüm maçlar bittiğinde playoff kurası butonu
+            </div>`; // european-live-standings + european-match-container
+
             if (allPlayed) {
-                html += `<div style="text-align: center; margin-top: 1rem;">
+                html += `<div style="text-align:center;margin-top:1rem;">
                     <button class="btn btn-success" onclick="window.footballSim.openPlayoffDraw('${comp}');">
                         <i class="fas fa-random"></i> Playoff Kura Çekimi
-                    </button>
-                </div>`;
+                    </button></div>`;
             } else {
-                html += `<div style="text-align: center; margin-top: 1rem;">
-                    <p style="color: #666;">Playoff kurası için tüm maçların bitmesi gerekli (${totalPlayed}/${totalMatches})</p>
+                html += `<div style="text-align:center;margin-top:1rem;">
+                    <button class="btn btn-warning" onclick="window.footballSim.simulateAllEuropeanMatchdays('${comp}')">
+                        <i class="fas fa-forward"></i> Tüm Sezonu Simüle Et
+                    </button>
+                    <p style="color:#666;margin-top:.5rem;font-size:.85rem;">Playoff için tüm maçların bitmesi gerekiyor (${totalPlayed}/${totalMatches})</p>
                 </div>`;
             }
         }
@@ -2520,219 +2498,52 @@ class FootballSimulation {
     }
 
     buildEuropeanGroupFixtures(state) {
-        const getCountry = (name) => { 
-            const t = this.teams.find(x => x.name === name); 
-            return t ? (t.country || this.leagueToCountry[t.league] || '') : ''; 
-        };
-        
-        // YENİ SİSTEM: 4 GRUPLU YAPI
-        const byPot = {
-            1: state.pots[1].map(n => ({ 
-                id: n, 
-                pot: 1, 
-                total_match_count: 0, 
-                home_count: 0, 
-                away_count: 0, 
-                opponents: new Set(), 
-                pot_count: { 1: 0, 2: 0, 3: 0, 4: 0 },
-                country: getCountry(n)
-            })),
-            2: state.pots[2].map(n => ({ 
-                id: n, 
-                pot: 2, 
-                total_match_count: 0, 
-                home_count: 0, 
-                away_count: 0, 
-                opponents: new Set(), 
-                pot_count: { 1: 0, 2: 0, 3: 0, 4: 0 },
-                country: getCountry(n)
-            })),
-            3: state.pots[3].map(n => ({ 
-                id: n, 
-                pot: 3, 
-                total_match_count: 0, 
-                home_count: 0, 
-                away_count: 0, 
-                opponents: new Set(), 
-                pot_count: { 1: 0, 2: 0, 3: 0, 4: 0 },
-                country: getCountry(n)
-            })),
-            4: state.pots[4].map(n => ({ 
-                id: n, 
-                pot: 4, 
-                total_match_count: 0, 
-                home_count: 0, 
-                away_count: 0, 
-                opponents: new Set(), 
-                pot_count: { 1: 0, 2: 0, 3: 0, 4: 0 },
-                country: getCountry(n)
-            }))
-        };
-        
+        // state.pots: { 1:[9 isim], 2:[9 isim], 3:[9 isim], 4:[9 isim] }
+        // Torba sırasına göre 36 takım listesi oluştur
+        const allNames = [
+            ...state.pots[1], ...state.pots[2],
+            ...state.pots[3], ...state.pots[4]
+        ];
+
+        // ── Berger Table Round Robin (8 tur, her tur 18 maç) ─────────────
+        // n=36 takım, sabit T0, diğerleri döner
+        // Her turda 18 benzersiz eşleşme, her takım her turda tam 1 maç
+        // 8 turda her takım tam 8 farklı rakiple oynuyor (tekrar yok)
+        const n = allNames.length; // 36
+        const circle = [...allNames.slice(1)]; // 35 eleman, dönen daire
+        const ROUNDS = 8;
+
         const fixtures = [];
-        
-        // GRUP OLUŞTURMA
-        const groups = {
-            1: { teams: [], countryCount: {} },
-            2: { teams: [], countryCount: {} },
-            3: { teams: [], countryCount: {} },
-            4: { teams: [], countryCount: {} }
-        };
-        
-        // İlk 2 lig (İspanya, Almanya) - 5 takım gönderir
-        const topCountries = ['Spain', 'Germany'];
-        
-        // Grup 1: Torba 1'den 3 takım + diğer torbalardan 2'şer takım
-        this.distributeToGroup(groups[1], byPot[1].slice(0, 3), topCountries, 2);
-        this.distributeToGroup(groups[1], byPot[2].slice(0, 2), topCountries, 1);
-        this.distributeToGroup(groups[1], byPot[3].slice(0, 2), topCountries, 1);
-        this.distributeToGroup(groups[1], byPot[4].slice(0, 2), topCountries, 1);
-        
-        // Grup 2: Torba 2'den 3 takım + diğer torbalardan 2'şer takım
-        this.distributeToGroup(groups[2], byPot[2].slice(3, 6), topCountries, 2);
-        this.distributeToGroup(groups[2], byPot[1].slice(3, 5), topCountries, 1);
-        this.distributeToGroup(groups[2], byPot[3].slice(2, 4), topCountries, 1);
-        this.distributeToGroup(groups[2], byPot[4].slice(2, 4), topCountries, 1);
-        
-        // Grup 3: Torba 3'ten 3 takım + diğer torbalardan 2'şer takım
-        this.distributeToGroup(groups[3], byPot[3].slice(4, 7), topCountries, 2);
-        this.distributeToGroup(groups[3], byPot[1].slice(5, 7), topCountries, 1);
-        this.distributeToGroup(groups[3], byPot[2].slice(5, 7), topCountries, 1);
-        this.distributeToGroup(groups[3], byPot[4].slice(4, 6), topCountries, 1);
-        
-        // Grup 4: Torba 4'ten 3 takım + diğer torbalardan 3'er takım
-        this.distributeToGroup(groups[4], byPot[4].slice(6, 9), topCountries, 3);
-        this.distributeToGroup(groups[4], byPot[1].slice(7, 9), topCountries, 1);
-        this.distributeToGroup(groups[4], byPot[2].slice(7, 9), topCountries, 1);
-        this.distributeToGroup(groups[4], byPot[3].slice(7, 9), topCountries, 1);
-        
-        // GRUP İÇİ FİKSTÜR OLUŞTURMA (9 maç günü)
-        Object.keys(groups).forEach(groupNum => {
-            const group = groups[groupNum];
-            const groupFixtures = this.createGroupFixtures(group.teams);
-            
-            // Maç günlerini dağıt (her günde bir takım bay)
-            groupFixtures.forEach((match, index) => {
-                match.matchday = Math.floor(index / 6) + 1; // Her günde 6 maç (3 grup, 2 maç/grup)
-                match.group = parseInt(groupNum);
-                fixtures.push(match);
+
+        for (let r = 0; r < ROUNDS; r++) {
+            const matchday = r + 1;
+
+            // Sabit takım (index 0) vs dairenin r. elemanı
+            const fixed = allNames[0];
+            const opp   = circle[r % circle.length];
+            fixtures.push({
+                homeTeam:  r % 2 === 0 ? fixed : opp,
+                awayTeam:  r % 2 === 0 ? opp   : fixed,
+                homeGoals: null,
+                awayGoals: null,
+                matchday
             });
-        });
-        
-        // İç saha/deplasman dağılımı
-        this.distributeHomeAway(fixtures);
-        
-        return fixtures;
-    }
-    
-    // Gruba takım dağıtma (lig kısıtlaması ile)
-    distributeToGroup(group, teams, topCountries, maxPerCountry) {
-        teams.forEach(team => {
-            const country = team.country;
-            
-            // Ülke kontrolü
-            if (topCountries.includes(country)) {
-                // İlk 2 lig için: bir grupta en fazla 2 takım
-                if ((group.countryCount[country] || 0) < maxPerCountry) {
-                    group.teams.push(team);
-                    group.countryCount[country] = (group.countryCount[country] || 0) + 1;
-                }
-            } else {
-                // Diğer ülkeler için: bir grupta en fazla 1 takım
-                if ((group.countryCount[country] || 0) < 1) {
-                    group.teams.push(team);
-                    group.countryCount[country] = (group.countryCount[country] || 0) + 1;
-                }
-            }
-        });
-    }
-    
-    // Grup içi fikstür oluşturma
-    createGroupFixtures(teams) {
-        const fixtures = [];
-        const teamCount = teams.length;
-        
-        // Her takım diğer tüm takımlarla 1 maç yapacak
-        for (let i = 0; i < teamCount; i++) {
-            for (let j = i + 1; j < teamCount; j++) {
+
+            // Kalan 17 çift: simetrik eşleşme
+            for (let i = 1; i <= 17; i++) {
+                const a = circle[(r + i)           % 35];
+                const b = circle[(r - i + 35 * 3)  % 35];
                 fixtures.push({
-                    homeTeam: teams[i].id,
-                    awayTeam: teams[j].id,
+                    homeTeam:  i % 2 === 0 ? a : b,
+                    awayTeam:  i % 2 === 0 ? b : a,
                     homeGoals: null,
                     awayGoals: null,
-                    matchday: null
+                    matchday
                 });
             }
         }
-        
+
         return fixtures;
-    }
-    
-    // İç saha/deplasman dağılımı
-    distributeHomeAway(fixtures) {
-        const teamHomeCount = {};
-        const teamAwayCount = {};
-        
-        fixtures.forEach(match => {
-            const homeTeam = match.homeTeam;
-            const awayTeam = match.awayTeam;
-            
-            teamHomeCount[homeTeam] = (teamHomeCount[homeTeam] || 0) + 1;
-            teamAwayCount[awayTeam] = (teamAwayCount[awayTeam] || 0) + 1;
-        });
-        
-        // Dengeli dağıtım için takas yap
-        fixtures.forEach(match => {
-            const homeTeam = match.homeTeam;
-            const awayTeam = match.awayTeam;
-            
-            const homeDiff = (teamHomeCount[homeTeam] || 0) - (teamAwayCount[homeTeam] || 0);
-            const awayDiff = (teamHomeCount[awayTeam] || 0) - (teamAwayCount[awayTeam] || 0);
-            
-            // Eğer ev sahibi çok fazla iç saha maçı yapıyorsa, takas yap
-            if (homeDiff > 1 && awayDiff < -1) {
-                match.homeTeam = awayTeam;
-                match.awayTeam = homeTeam;
-                
-                teamHomeCount[homeTeam]--;
-                teamAwayCount[homeTeam]++;
-                teamHomeCount[awayTeam]++;
-                teamAwayCount[awayTeam]--;
-            }
-        });
-    }
-    
-    // KONTROL FONKSİYONU
-    canCreateMatch(teamA, teamB, potB) {
-        // ADIM 4 - KISIT KONTROLLERİ
-        if (teamA.id === teamB.id) return false; // teamA ≠ teamB
-        if (teamA.opponents.has(teamB.id)) return false; // teamB teamA.opponents içinde değil
-        if (teamA.total_match_count >= 8) return false; // teamA.total_match_count < 8
-        if (teamB.total_match_count >= 8) return false; // teamB.total_match_count < 8
-        if (teamA.pot_count[potB] >= 2) return false; // teamA.pot_count[ilgiliPot] < 2
-        if (teamB.pot_count[teamA.pot] >= 2) return false; // teamB.pot_count[ilgiliPot] < 2
-        
-        // AYNI LİG KONTROLÜ
-        if (teamA.country === teamB.country) {
-            // Aynı ülke takımları genellikle eşleşemez
-            // Ancak mecburiyet durumunda en fazla 1 maç olabilir
-            // Bu kontrolü daha üst seviyede yöneteceğiz
-            return false; // Şimdilik tüm aynı lig maçlarını engelle
-        }
-        
-        return true;
-    }
-    
-    // TAKIM İSTATİSTİKLERİNİ GÜNCELLE
-    updateTeamStats(teamA, teamB, potB) {
-        teamA.opponents.add(teamB.id);
-        teamB.opponents.add(teamA.id);
-        
-        teamA.pot_count[potB]++;
-        teamB.pot_count[teamA.pot]++;
-        
-        teamA.total_match_count++;
-        teamB.total_match_count++;
     }
 
     getEuropeanGroupStandings(comp) {
@@ -2761,6 +2572,21 @@ class FootballSimulation {
         m.homeGoals = res.homeGoals;
         m.awayGoals = res.awayGoals;
         this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    simulateAllEuropeanMatchdays(comp) {
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
+        const unplayed = state.groupMatches.filter(m => m.homeGoals == null);
+        unplayed.forEach(m => {
+            const home = this.teams.find(t => t.name === m.homeTeam) || { rating: 7 };
+            const away = this.teams.find(t => t.name === m.awayTeam) || { rating: 7 };
+            const res = this.simulateMatch(home, away, true);
+            m.homeGoals = res.homeGoals;
+            m.awayGoals = res.awayGoals;
+        });
+        this.saveData();
+        this.addActivity(`${this.europeanCompetitions[comp.toUpperCase()].name} lig fazı tamamlandı`);
         this.showEuropeanCompetition(comp.toLowerCase());
     }
 
