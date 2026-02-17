@@ -194,6 +194,72 @@ main {
     transform: translateY(-2px);
 }
 
+.groups-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.group-section {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.group-section h6 {
+    margin: 0 0 0.5rem 0;
+    color: #2d3748;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.standing-position-1-9 {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.standing-position-10-18 {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+}
+
+.standing-position-19-27 {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+}
+
+.standing-position-28-36 {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.standing-position-1-8 {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.standing-position-9-16 {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+}
+
+.standing-position-17-24 {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+}
+
+.standing-position-25-36 {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #4299e1, #3182ce);
+    color: white;
+}
+
 .btn-success {
     background: linear-gradient(135deg, #48bb78, #38a169);
     color: white;
@@ -212,11 +278,6 @@ main {
 .btn-warning:hover {
     background: linear-gradient(135deg, #dd6b20, #c05621);
     transform: translateY(-2px);
-}
-
-.btn-info {
-    background: linear-gradient(135deg, #4299e1, #3182ce);
-    color: white;
 }
 
 .btn-info:hover {
@@ -1194,6 +1255,733 @@ footer {
 .historical-season-block h4 {
     margin-bottom: 0.75rem;
     color: #2d3748;
+}
+
+/* European Participants Grid */
+.european-participants-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 2px solid #e2e8f0;
+}
+
+.participant-item {
+    background: white;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #2d3748;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.participant-item:hover {
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.participant-item .team-name {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.participant-item .team-league {
+    font-size: 0.75rem;
+    color: #718096;
+    background: #f1f5f9;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    margin-top: 0.25rem;
+}
+
+/* European Pots */
+.european-pots-container {
+    margin-bottom: 2rem;
+}
+
+.pots-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.pot-section {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+    border: 2px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.pot-header {
+    text-align: center;
+    font-weight: bold;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    border-radius: 8px;
+    color: white;
+    font-size: 0.9rem;
+}
+
+.pot-1 .pot-header { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.pot-2 .pot-header { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.pot-3 .pot-header { background: linear-gradient(135deg, #10b981, #059669); }
+.pot-4 .pot-header { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+
+.pot-teams {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.pot-team {
+    background: #f8fafc;
+    padding: 0.5rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.pot-team:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e0;
+}
+
+/* European Standings Colors */
+.standing-position-1-8 {
+    background-color: #16a34a !important;
+    color: white !important;
+    font-weight: bold;
+}
+
+.standing-position-9-16 {
+    background-color: #3b82f6 !important;
+    color: white !important;
+}
+
+.standing-position-17-24 {
+    background-color: #60a5fa !important;
+    color: white !important;
+}
+
+.standing-position-25-36 {
+    background-color: #dc2626 !important;
+    color: white !important;
+}
+
+/* European Match Layout */
+.european-match-container {
+    display: grid;
+    grid-template-columns: 1fr 350px;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 1200px) {
+    .european-match-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.european-live-standings {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem;
+    position: sticky;
+    top: 80px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.european-live-standings h4 {
+    margin-bottom: 0.75rem;
+    color: #2d3748;
+    font-size: 1rem;
+    text-align: center;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 0.5rem;
+}
+
+.european-standings-table {
+    width: 100%;
+    font-size: 0.8rem;
+    border-collapse: collapse;
+}
+
+.european-standings-table th,
+.european-standings-table td {
+    padding: 0.4rem;
+    text-align: center;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.european-standings-table th {
+    background: #f8fafc;
+    font-weight: 600;
+    color: #4a5568;
+    position: sticky;
+    top: 0;
+}
+
+.european-matchday-block {
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+}
+
+.european-matchday-block h5 {
+    margin: 0 0 0.75rem 0;
+    color: #2d3748;
+    font-size: 1rem;
+    text-align: center;
+    background: white;
+    padding: 0.5rem;
+    border-radius: 6px;
+}
+
+.european-fixtures-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 0.75rem;
+}
+
+.european-fixtures-list li {
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+.european-fixtures-list li:hover {
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+}
+
+.european-match-teams {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    color: #2d3748;
+}
+
+.european-match-score {
+    font-weight: bold;
+    color: #16a34a;
+    background: #f0fdf4;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    margin: 0 0.5rem;
+}
+
+.european-match-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-xs {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-xs.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-xs.btn-primary:hover {
+    background: #5a6fd8;
+}
+
+.btn-xs.btn-success {
+    background: #16a34a;
+    color: white;
+}
+
+.btn-xs.btn-success:hover {
+    background: #15803d;
+}
+
+/* Enhanced Draw Styles */
+.draw-ceremony {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    padding: 2rem;
+    margin: 2rem 0;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    color: white;
+}
+
+.draw-ceremony h4 {
+    text-align: center;
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.draw-pairs-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.draw-pair {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 15px;
+    padding: 1rem;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.draw-pair:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
+}
+
+.draw-pair-teams {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.draw-pair-teams .vs {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.draw-pair-league {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.25rem 0.5rem;
+    border-radius: 10px;
+    display: inline-block;
+}
+
+.draw-selection-area {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.draw-selection-area h5 {
+    color: #2d3748;
+    margin-bottom: 1rem;
+    text-align: center;
+    font-size: 1.1rem;
+}
+
+.draw-teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.draw-team-button {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.75rem;
+    text-align: center;
+    font-weight: 500;
+    color: #2d3748;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.draw-team-button:hover:not(:disabled) {
+    border-color: #667eea;
+    background: #f0f4ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.draw-team-button.selected {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-color: #667eea;
+    transform: scale(1.05);
+}
+
+.draw-team-button.disabled {
+    background: #f1f5f9;
+    color: #94a3b8;
+    border-color: #cbd5e0;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.draw-team-button.disabled::after {
+    content: "🚫";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 0.8rem;
+}
+
+.draw-status {
+    text-align: center;
+    padding: 1rem;
+    background: #f0f9ff;
+    border: 2px solid #3b82f6;
+    border-radius: 10px;
+    margin: 1rem 0;
+    color: #1e40af;
+    font-weight: 500;
+}
+
+.draw-status.warning {
+    background: #fef3c7;
+    border-color: #f59e0b;
+    color: #92400e;
+}
+
+.draw-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1.5rem;
+}
+
+.draw-progress {
+    background: #e2e8f0;
+    border-radius: 10px;
+    height: 8px;
+    margin: 1rem 0;
+    overflow: hidden;
+}
+
+.draw-progress-fill {
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    height: 100%;
+    transition: width 0.5s ease;
+}
+
+/* Playoff Draw Enhancement */
+.playoff-draw-slot {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.playoff-draw-slot strong {
+    color: #2d3748;
+    display: block;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.playoff-bowl {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+/* R16 Draw Enhancement */
+.r16-draw-wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.r16-draw-wrap .bowl {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.r16-draw-wrap .bowl strong {
+    display: block;
+    margin-bottom: 0.75rem;
+    color: #2d3748;
+    text-align: center;
+}
+
+/* Quarter Final Draw Enhancement */
+.qf-draw-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    border-radius: 15px;
+    border: 2px solid #cbd5e0;
+}
+
+.qf-first {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.qf-first:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.qf-opponent {
+    background: #f1f5f9;
+    color: #1e40af;
+    border: 2px solid #3b82f6;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.qf-opponent:hover:not(:disabled) {
+    background: #dbeafe;
+    border-color: #2563eb;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.qf-opponent:disabled {
+    background: #f1f5f9;
+    color: #94a3b8;
+    border-color: #cbd5e0;
+    cursor: not-allowed;
+    opacity: 0.6;
+    position: relative;
+}
+
+.qf-opponent:disabled::after {
+    content: "❌";
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ef4444;
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+}
+
+/* European Match Container Update */
+.european-matches-section {
+    flex: 1;
+}
+
+/* Disabled button styles */
+.draw-btn.disabled {
+    background: #f1f5f9 !important;
+    color: #94a3b8 !important;
+    border-color: #cbd5e0 !important;
+    cursor: not-allowed !important;
+    opacity: 0.6 !important;
+}
+
+.draw-btn.disabled:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Pot Controls */
+.pots-controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.pot-count {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    margin-left: 0.5rem;
+}
+
+.team-actions {
+    margin-top: 0.25rem;
+    text-align: center;
+}
+
+.btn-move {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-move:hover {
+    background: #5a6fd8;
+    transform: scale(1.1);
+}
+
+.btn-swap {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-left: 0.2rem;
+}
+
+.btn-swap:hover {
+    background: #059669;
+    transform: scale(1.1);
+}
+
+/* Drag and Drop Styles */
+.pot-team[draggable="true"] {
+    cursor: move;
+    transition: all 0.2s ease;
+}
+
+.pot-team[draggable="true"]:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.pot-team.dragging {
+    opacity: 0.5;
+}
+
+.pot-teams.drag-over {
+    background: #f0f4ff;
+    border: 2px dashed #667eea;
+}
+
+/* Modal Styles */
+#moveTeamModal {
+    backdrop-filter: blur(5px);
+}
+
+#moveTeamModal > div {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+#moveTeamModal h5 {
+    margin-bottom: 1rem;
+    color: #2d3748;
+}
+
+#moveTeamModal p {
+    font-weight: 500;
+    color: #4a5568;
+    margin-bottom: 1rem;
+}
+
+#moveTeamModal select {
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    background: white;
+}
+
+#moveTeamModal button {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+#moveTeamModal .btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+#moveTeamModal .btn-primary:hover {
+    background: #5a6fd8;
+}
+
+#moveTeamModal .btn-secondary {
+    background: #e2e8f0;
+    color: #4a5568;
+}
+
+#moveTeamModal .btn-secondary:hover {
+    background: #cbd5e0;
+}
+
+/* Enhanced Pot Team Styles */
+.pot-team {
+    position: relative;
+    background: #f8fafc;
+    padding: 0.5rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.pot-team:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e0;
+    transform: translateY(-1px);
+}
+
+.pot-team.selected {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-color: #667eea;
 }
 
 /* Loading States */
