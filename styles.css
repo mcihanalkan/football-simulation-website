@@ -1963,25 +1963,91 @@ footer {
 .pot-team {
     position: relative;
     background: #f8fafc;
-    padding: 0.5rem;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    text-align: center;
-    border: 1px solid #e2e8f0;
-    transition: all 0.2s ease;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    border: 2px solid #e2e8f0;
+    transition: all 0.18s ease;
     user-select: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
 }
 
 .pot-team:hover {
-    background: #f1f5f9;
-    border-color: #cbd5e0;
+    background: #eef2ff;
+    border-color: #667eea;
     transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(102, 126, 234, 0.15);
 }
 
-.pot-team.selected {
+.pot-team.pot-team-selected {
     background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;
-    border-color: #667eea;
+    border-color: #5a6fd8;
+    transform: scale(1.03);
+    box-shadow: 0 4px 14px rgba(102, 126, 234, 0.35);
+}
+
+.pot-team.pot-team-target {
+    border-color: #10b981;
+    background: #f0fdf4;
+}
+
+.pot-team.pot-team-target:hover {
+    background: #d1fae5;
+    border-color: #059669;
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.2);
+}
+
+.pot-team-name {
+    flex: 1;
+    text-align: left;
+}
+
+.pot-team-badge {
+    font-size: 0.8rem;
+    font-weight: bold;
+    opacity: 0.9;
+}
+
+/* Swap hint bar */
+.pot-swap-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #f8fafc;
+    border: 2px dashed #cbd5e0;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+.pot-swap-hint.active {
+    background: #eff6ff;
+    border: 2px solid #3b82f6;
+    color: #1e40af;
+}
+
+.btn-cancel-swap {
+    margin-left: auto;
+    background: #fee2e2;
+    color: #dc2626;
+    border: none;
+    border-radius: 6px;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.btn-cancel-swap:hover {
+    background: #fecaca;
 }
 
 /* Loading States */
