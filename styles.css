@@ -431,6 +431,29 @@ main {
     background: #f8fafc;
 }
 
+.european-standings-wrap {
+    max-height: 400px;
+    overflow: auto;
+    margin-bottom: 1rem;
+}
+.european-matchday-block {
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+}
+.european-matchday-block h5 { margin: 0 0 0.5rem 0; color: #2d3748; }
+.european-fixtures-list { list-style: none; padding: 0; margin: 0; }
+.european-fixtures-list li { padding: 0.35rem 0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.european-fixtures-list .btn-xs { padding: 0.2rem 0.5rem; font-size: 0.8rem; }
+.playoff-draw-slot { margin: 0.75rem 0; padding: 0.5rem; background: #fff; border-radius: 8px; }
+.playoff-draw-slot .bowl { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; margin: 0 0.25rem; }
+.draw-btn { white-space: nowrap; }
+.draw-hint { background: #e6fffa; padding: 0.5rem; border-radius: 8px; margin-bottom: 0.5rem; }
+.playoff-tie { padding: 0.5rem; margin: 0.25rem 0; background: #fff; border-radius: 8px; }
+.r16-draw-wrap { display: flex; flex-wrap: wrap; gap: 1rem; }
+.r16-draw-wrap .bowl { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+
 /* Season Controls */
 .season-controls {
     display: grid;
@@ -915,6 +938,37 @@ footer {
     text-align: center;
 }
 
+.fixtures-and-standings {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 1.5rem;
+    align-items: start;
+}
+@media (max-width: 1100px) {
+    .fixtures-and-standings { grid-template-columns: 1fr; }
+}
+.live-standings-panel {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem;
+    position: sticky;
+    top: 80px;
+}
+.live-standings-panel h4 { margin-bottom: 0.75rem; font-size: 1rem; }
+.live-standings-table-wrap { overflow-x: auto; max-height: 420px; overflow-y: auto; }
+.live-standings-table { font-size: 0.85rem; }
+.live-standings-table td, .live-standings-table th { padding: 0.35rem 0.5rem; }
+
+.season-fixtures-section { margin-top: 2rem; padding-top: 1.5rem; border-top: 2px solid #e2e8f0; }
+.season-fixtures-section h4 { margin-bottom: 1rem; }
+.week-results-block { margin-bottom: 1rem; }
+.week-results-list { list-style: none; padding-left: 0; }
+.week-results-list li { padding: 0.25rem 0; border-bottom: 1px solid #eee; }
+.league-table-controls { align-items: center; }
+.league-table-controls label { margin-right: 0.5rem; }
+.league-table-controls select { padding: 0.5rem 1rem; border-radius: 8px; }
+
 .fixtures-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
@@ -1132,6 +1186,14 @@ footer {
 .team-points-summary p {
     color: #718096;
     font-size: 0.9rem;
+}
+
+.historical-season-block {
+    margin-bottom: 2rem;
+}
+.historical-season-block h4 {
+    margin-bottom: 0.75rem;
+    color: #2d3748;
 }
 
 /* Loading States */
