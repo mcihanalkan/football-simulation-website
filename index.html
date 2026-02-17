@@ -156,21 +156,8 @@
         <section id="leagues" class="section">
             <h2>Lig Durumları</h2>
             <div class="leagues-container">
-                <div class="league-tabs">
-                    <button class="league-tab active" data-league="La Liga">🇪🇸 La Liga</button>
-                    <button class="league-tab" data-league="Bundesliga">🇩🇪 Bundesliga</button>
-                    <button class="league-tab" data-league="Premier League">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</button>
-                    <button class="league-tab" data-league="Serie A">🇮🇹 Serie A</button>
-                    <button class="league-tab" data-league="Süper Lig">🇹🇷 Süper Lig</button>
-                    <button class="league-tab" data-league="Ligue 1">🇫🇷 Ligue 1</button>
-                    <button class="league-tab" data-league="Liga Portugal">🇵🇹 Liga Portugal</button>
-                    <button class="league-tab" data-league="Scottish Premiership">🏴󠁧󠁢󠁳󠁣󠁴󠁿 Scottish Prem</button>
-                    <button class="league-tab" data-league="Czech First League">🇨🇿 Czech League</button>
-                    <button class="league-tab" data-league="Belgium Pro League">🇧🇪 Belgium</button>
-                    <button class="league-tab" data-league="Super League Greece">🇬🇷 Greece</button>
-                    <button class="league-tab" data-league="Austrian Bundesliga">🇦🇹 Austria</button>
-                    <button class="league-tab" data-league="Danish Superliga">🇩🇰 Denmark</button>
-                    <button class="league-tab" data-league="Eredivisie">🇳🇱 Eredivisie</button>
+                <div id="league-tabs-container" class="league-tabs">
+                    <!-- Lig sekmeleri JS ile doldurulur -->
                 </div>
 
                 <div id="league-table" class="league-table-container">
@@ -236,8 +223,14 @@
                     </button>
                 </div>
                 
-                <div id="weekly-fixtures" class="weekly-fixtures">
-                    <!-- Weekly fixtures will be displayed here -->
+                <div class="fixtures-and-standings">
+                    <div id="weekly-fixtures" class="weekly-fixtures">
+                        <!-- Weekly fixtures will be displayed here -->
+                    </div>
+                    <div id="live-standings" class="live-standings-panel">
+                        <h4>Anlık Puan Durumu</h4>
+                        <p class="no-data">Lig seçip maç simüle ettikçe burada güncel puan durumu görünür.</p>
+                    </div>
                 </div>
             </div>
 
@@ -419,10 +412,6 @@
                 <div class="form-group">
                     <label for="team-rating">Başlangıç Reytingi (0.5 - 9.9):</label>
                     <input type="number" id="team-rating" min="0.5" max="9.9" step="0.1" value="7.5" required>
-                </div>
-                <div class="form-group">
-                    <label for="team-country">Ülke:</label>
-                    <input type="text" id="team-country" required>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('add-team-modal')">İptal</button>
