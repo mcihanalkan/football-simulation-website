@@ -1815,9 +1815,111 @@ footer {
     font-size: 0.7rem;
 }
 
-/* European Match Container Update */
-.european-matches-section {
+/* Lig Fazı Maç Günleri */
+.european-matchday-block {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+
+.matchday-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 1rem;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+.matchday-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.matchday-progress {
+    font-size: 0.8rem;
+    opacity: 0.85;
+    margin-left: auto;
+}
+
+.matchday-done {
+    font-size: 1rem;
+    color: #a7f3d0;
+}
+
+.european-fixtures-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.european-fixtures-list li {
+    display: flex;
+    align-items: center;
+    padding: 0.45rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.85rem;
+    gap: 0.5rem;
+}
+
+.european-fixtures-list li:last-child {
+    border-bottom: none;
+}
+
+.european-fixtures-list li.played {
+    background: #f8fafc;
+}
+
+.match-team {
     flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.match-team.home {
+    text-align: right;
+    font-weight: 500;
+}
+
+.match-team.away {
+    text-align: left;
+}
+
+.european-match-score {
+    background: #2d3748;
+    color: white;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    min-width: 38px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.european-match-score.unplayed {
+    background: #cbd5e0;
+    color: #4a5568;
+    font-weight: 400;
+}
+
+.standings-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.standings-legend .legend-item {
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: white;
 }
 
 /* Disabled button styles */
