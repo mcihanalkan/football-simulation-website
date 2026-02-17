@@ -1567,8 +1567,8 @@ class FootballSimulation {
                     <div class="european-participants-grid">
                         ${partList.map(p => `
                             <div class="participant-item">
-                                <div class="team-name">${typeof p === 'string' ? p : (p.team || p)}</div>
-                                ${p.league && typeof p === 'object' ? `<div class="team-league">${p.league}</div>` : ''}
+                                <div class="team-name">${this._getTeamName(p)}</div>
+                                ${p && typeof p === 'object' && p.league ? `<div class="team-league">${p.league}</div>` : ''}
                             </div>
                         `).join('')}
                         ${partList.length < 36 ? Array(36 - partList.length).fill('<div class="participant-item" style="opacity: 0.3; border-style: dashed;">-</div>').join('') : ''}
@@ -1579,9 +1579,20 @@ class FootballSimulation {
 
         if (state.phase === 'none') {
             if (has36) {
+                const swapSelected = this._potSwapSelected ? this._potSwapSelected[comp] : null;
                 html += `
                     <div class="european-pots-container">
-                        <h4>Torbalara Ayırma (Manuel Düzenleme)</h4>
+                        <h4>Torbalara Ayırma</h4>
+                        ${swapSelected ? `
+                            <div class="pot-swap-hint active">
+                                ✅ <strong>${swapSelected.team}</strong> seçildi (Torba ${swapSelected.pot}) — Yer değiştirmek istediğin takıma tıkla
+                                <button class="btn-cancel-swap" onclick="window.footballSim.cancelPotSwap('${comp}')">✕ İptal</button>
+                            </div>
+                        ` : `
+                            <div class="pot-swap-hint">
+                                💡 Yer değiştirmek için önce bir takıma, ardından diğerine tıkla
+                            </div>
+                        `}
                         <div class="pots-controls">
                             <button class="btn btn-success mb-3" onclick="window.footballSim.startEuropeanGroupStage('${comp}');">
                                 <i class="fas fa-play"></i> Grup Aşaması Başlat
@@ -1600,40 +1611,22 @@ class FootballSimulation {
                                             <span class="pot-count">(${potTeams.length}/9)</span>
                                         </div>
                                         <div class="pot-teams" id="pot-${potNum}-teams">
-                                            ${potTeams.map(p => `
-                                                <div class="pot-team" draggable="true" data-team="${typeof p === 'string' ? p : (p.team || p)}" data-league="${typeof p === 'object' ? p.league : ''}">
-                                                    ${typeof p === 'string' ? p : (p.team || p)}
-                                                    <div class="team-actions">
-                                                        <button class="btn-xs btn-move" onclick="window.footballSim.showMoveOptions('${typeof p === 'string' ? p : (p.team || p)}', ${potNum})">🔄</button>
-                                                        <button class="btn-xs btn-swap" onclick="window.footballSim.showSwapOptions('${typeof p === 'string' ? p : (p.team || p)}', ${potNum})">⇄</button>
+                                            ${potTeams.map(p => {
+                                                const teamName = this._getTeamName(p);
+                                                const isSelected = swapSelected && swapSelected.team === teamName;
+                                                const isTarget = swapSelected && !isSelected;
+                                                return `
+                                                    <div class="pot-team ${isSelected ? 'pot-team-selected' : ''} ${isTarget ? 'pot-team-target' : ''}"
+                                                         onclick="window.footballSim.handlePotTeamClick('${teamName.replace(/'/g, "\\'")}', ${potNum}, '${comp}')">
+                                                        <span class="pot-team-name">${teamName}</span>
+                                                        ${isSelected ? '<span class="pot-team-badge">✓</span>' : ''}
                                                     </div>
-                                                </div>
-                                            `).join('')}
+                                                `;
+                                            }).join('')}
                                         </div>
                                     </div>
                                 `;
                             }).join('')}
-                        </div>
-                        
-                        <!-- Takım Taşıma Modal -->
-                        <div id="moveTeamModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 10px; min-width: 400px;">
-                                <h5>Takımı Taşı</h5>
-                                <p id="moveTeamName"></p>
-                                <div style="margin: 1rem 0;">
-                                    <label>Hedef Torba:</label>
-                                    <select id="targetPot" style="width: 100%; padding: 0.5rem; margin-top: 0.5rem;">
-                                        <option value="1">Torba 1</option>
-                                        <option value="2">Torba 2</option>
-                                        <option value="3">Torba 3</option>
-                                        <option value="4">Torba 4</option>
-                                    </select>
-                                </div>
-                                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                                    <button class="btn btn-secondary" onclick="window.footballSim.closeMoveModal()">İptal</button>
-                                    <button class="btn btn-primary" onclick="window.footballSim.moveTeam()">Taşı</button>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 `;
@@ -2225,210 +2218,94 @@ class FootballSimulation {
     }
 
     // Manuel torba düzenleme fonksiyonları
-    showMoveOptions(teamName, currentPot) {
-        this.currentMoveTeam = teamName;
-        this.currentMovePot = currentPot;
-        
-        document.getElementById('moveTeamName').textContent = `Takım: ${teamName}`;
-        document.getElementById('targetPot').value = currentPot;
-        document.getElementById('moveTeamModal').style.display = 'block';
+    // Torbada takıma tıklanınca çalışır (seç + yer değiştir)
+    handlePotTeamClick(teamName, potNum, comp) {
+        if (!this._potSwapSelected) this._potSwapSelected = {};
+        const current = this._potSwapSelected[comp];
+
+        if (!current) {
+            // İlk tıklama: takımı seç
+            this._potSwapSelected[comp] = { team: teamName, pot: potNum };
+            this.showEuropeanCompetition(comp);
+        } else if (current.team === teamName) {
+            // Aynı takıma tekrar tıklandı: seçimi iptal et
+            this._potSwapSelected[comp] = null;
+            this.showEuropeanCompetition(comp);
+        } else {
+            // İkinci tıklama: yer değiştir
+            this.executeSwap(current.team, teamName, comp);
+            this._potSwapSelected[comp] = null;
+        }
     }
 
-    closeMoveModal() {
-        document.getElementById('moveTeamModal').style.display = 'none';
-        this.currentMoveTeam = null;
-        this.currentMovePot = null;
-    }
-
-    moveTeam() {
-        if (!this.currentMoveTeam || !this.currentMovePot) return;
-        
-        const targetPot = parseInt(document.getElementById('targetPot').value);
-        const sourcePot = this.currentMovePot;
-        
-        if (targetPot === sourcePot) {
-            alert('Takım zaten bu torbada!');
-            return;
-        }
-        
-        // European participants verisini güncelle
-        const comp = this.getCurrentEuropeanCompetition();
-        if (!comp) return;
-        
-        const part = this.europeanSeason2028_29[comp.toUpperCase()] || this.getEuropeanParticipants2028_29()[comp.toUpperCase()];
-        if (!part) return;
-        
-        // Takımı bul ve taşı
-        const teamIndex = part.findIndex(p => {
-            const teamName = typeof p === 'string' ? p : (p.team || p);
-            return teamName === this.currentMoveTeam;
-        });
-        
-        if (teamIndex === -1) return;
-        
-        const team = part[teamIndex];
-        part.splice(teamIndex, 1);
-        
-        // Hedef torba pozisyonunu hesapla
-        const targetPosition = (targetPot - 1) * 9;
-        
-        // Hedef torbanın mevcut durumunu kontrol et
-        const targetPotTeams = part.slice(targetPosition, targetPosition + 9);
-        if (targetPotTeams.length >= 9) {
-            alert('Hedef torba zaten dolu! Başka bir takım taşımayı deneyin veya önce yer açın.');
-            return;
-        }
-        
-        part.splice(targetPosition, 0, team);
-        
-        // State'i güncelle
-        const state = this.getEuropeanPlayableState(comp.toUpperCase());
-        if (state && state.participants) {
-            // Participants listesini yeniden oluştur
-            const newParticipants = part.slice(0, 36).map(p => {
-                const teamName = typeof p === 'string' ? p : (p.team || p);
-                const team = this.teams.find(t => t.name === teamName);
-                return { 
-                    name: teamName, 
-                    league: typeof p === 'object' ? p.league : '', 
-                    country: team ? (team.country || this.leagueToCountry[team.league] || '') : '',
-                    rating: this.normalizeRating(team?.rating) || 7 
-                };
-            });
-            
-            // Torbaları yeniden oluştur
-            state.participants = newParticipants;
-            state.pots = { 1: [], 2: [], 3: [], 4: [] };
-            newParticipants.forEach((t, i) => {
-                const pot = Math.floor(i / 9) + 1;
-                state.pots[pot].push(t.name);
-            });
-            
-            // Eğer grup aşaması başlamadıysa, fikstürü yeniden oluştur
-            if (state.phase === 'none') {
-                state.groupMatches = this.buildEuropeanGroupFixtures(state);
-            }
-        }
-        
-        // Kaydet ve arayüzü güncelle
-        this.europeanSeason2028_29[comp.toUpperCase()] = part;
-        this.saveData();
+    // Seçimi iptal et
+    cancelPotSwap(comp) {
+        if (!this._potSwapSelected) this._potSwapSelected = {};
+        this._potSwapSelected[comp] = null;
         this.showEuropeanCompetition(comp);
-        this.closeMoveModal();
-        
-        this.addActivity(`${this.currentMoveTeam} Torba ${sourcePot}'dan Torba ${targetPot}'a taşındı`);
     }
 
-    // Takım yer değiştirme seçeneklerini göster
-    showSwapOptions(teamName, currentPot) {
-        const comp = this.getCurrentEuropeanCompetition();
-        if (!comp) return;
-        
-        const part = this.europeanSeason2028_29[comp.toUpperCase()] || this.getEuropeanParticipants2028_29()[comp.toUpperCase()];
-        if (!part) return;
-        
-        // Tüm takımları listele (mevcut takım hariç)
-        const allTeams = part.map(p => typeof p === 'string' ? p : (p.team || p)).filter(t => t !== teamName);
-        
-        const modalHtml = `
-            <div id="swapTeamModal" style="display: block; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 10px; min-width: 500px; max-width: 80%;">
-                    <h5>🔄 Takım Yer Değiştir</h5>
-                    <p><strong>Seçilen takım:</strong> ${teamName} (Torba ${currentPot})</p>
-                    <div style="margin: 1rem 0;">
-                        <label>Yer değiştirilecek takım:</label>
-                        <select id="swapTargetTeam" style="width: 100%; padding: 0.5rem; margin-top: 0.5rem; border: 2px solid #e2e8f0; border-radius: 6px; background: white;">
-                            <option value="">Takım seçin...</option>
-                            ${allTeams.map(team => `<option value="${team}">${team}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                        <button class="btn btn-secondary" onclick="window.footballSim.closeSwapModal()">İptal</button>
-                        <button class="btn btn-primary" onclick="window.footballSim.executeSwap('${teamName}', document.getElementById('swapTargetTeam').value, '${comp}');">Yer Değiştir</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Modal'ı body'ye ekle
-        const modalDiv = document.createElement('div');
-        modalDiv.innerHTML = modalHtml;
-        document.body.appendChild(modalDiv);
-        
-        // Modal kapatma olayları
-        modalDiv.addEventListener('click', (e) => {
-            if (e.target === modalDiv) {
-                this.closeSwapModal();
-            }
-        });
-    }
-
-    closeSwapModal() {
-        const modal = document.getElementById('swapTeamModal');
-        if (modal) {
-            modal.remove();
-        }
+    // Takım adını normalize et (string ya da {team/name: ...} objesinden ismi çıkar)
+    _getTeamName(p) {
+        if (typeof p === 'string') return p;
+        if (p && typeof p === 'object') return p.name || p.team || '';
+        return '';
     }
 
     // İki takım arasında yer değiştirme
     executeSwap(team1, team2, comp) {
-        const part = this.europeanSeason2028_29[comp.toUpperCase()] || this.getEuropeanParticipants2028_29()[comp.toUpperCase()];
-        if (!part) return;
-        
-        const index1 = part.findIndex(p => {
-            const teamName = typeof p === 'string' ? p : (p.team || p);
-            return teamName === team1;
-        });
-        
-        const index2 = part.findIndex(p => {
-            const teamName = typeof p === 'string' ? p : (p.team || p);
-            return teamName === team2;
-        });
-        
-        if (index1 === -1 || index2 === -1) {
-            alert('Takım bulunamadı!');
+        const compKey = comp.toUpperCase();
+
+        // Her iki kaynaktan da part listesini al, ama her zaman europeanSeason2028_29'a yaz
+        let part = this.europeanSeason2028_29[compKey];
+        if (!part || part.length === 0) {
+            part = this.getEuropeanParticipants2028_29()[compKey];
+            this.europeanSeason2028_29[compKey] = part;
+        }
+        if (!part || part.length === 0) {
+            alert('Katılımcı listesi boş!');
             return;
         }
-        
-        // Takımları yer değiştir
+
+        const index1 = part.findIndex(p => this._getTeamName(p) === team1);
+        const index2 = part.findIndex(p => this._getTeamName(p) === team2);
+
+        if (index1 === -1 || index2 === -1) {
+            // Debug için hangi isimlerin bulunduğunu konsola yazdır
+            console.error('Swap başarısız:', { team1, team2, index1, index2 });
+            console.log('Part listesi:', part.slice(0, 5).map(p => this._getTeamName(p)));
+            alert(`Takım bulunamadı!\n"${team1}" (${index1})\n"${team2}" (${index2})`);
+            return;
+        }
+
+        // Yer değiştir
         [part[index1], part[index2]] = [part[index2], part[index1]];
-        
-        // State'i güncelle
-        const state = this.getEuropeanPlayableState(comp.toUpperCase());
-        if (state && state.participants) {
-            // Participants listesini yeniden oluştur
+
+        // State varsa participants ve pots'u da güncelle
+        const state = this.getEuropeanPlayableState(compKey);
+        if (state) {
             const newParticipants = part.slice(0, 36).map(p => {
-                const teamName = typeof p === 'string' ? p : (p.team || p);
-                const team = this.teams.find(t => t.name === teamName);
-                return { 
-                    name: teamName, 
-                    league: typeof p === 'object' ? p.league : '', 
-                    country: team ? (team.country || this.leagueToCountry[team.league] || '') : '',
-                    rating: this.normalizeRating(team?.rating) || 7 
+                const teamName = this._getTeamName(p);
+                const teamData = this.teams.find(t => t.name === teamName);
+                return {
+                    name: teamName,
+                    league: (typeof p === 'object' && p.league) ? p.league : (teamData?.league || ''),
+                    country: teamData ? (teamData.country || this.leagueToCountry[teamData.league] || '') : '',
+                    rating: this.normalizeRating(teamData?.rating) || 7
                 };
             });
-            
-            // Torbaları yeniden oluştur
             state.participants = newParticipants;
             state.pots = { 1: [], 2: [], 3: [], 4: [] };
             newParticipants.forEach((t, i) => {
                 const pot = Math.floor(i / 9) + 1;
-                state.pots[pot].push(t.name);
+                if (state.pots[pot]) state.pots[pot].push(t.name);
             });
-            
-            // Eğer grup aşaması başlamadıysa, fikstürü yeniden oluştur
-            if (state.phase === 'none') {
-                state.groupMatches = this.buildEuropeanGroupFixtures(state);
-            }
         }
-        
-        // Kaydet ve arayüzü güncelle
-        this.europeanSeason2028_29[comp.toUpperCase()] = part;
+
+        this.europeanSeason2028_29[compKey] = part;
         this.saveData();
         this.showEuropeanCompetition(comp);
-        this.closeSwapModal();
-        
-        this.addActivity(`${team1} ve ${team2} yer değiştirildi`);
+        this.addActivity(`${team1} ↔ ${team2} yer değiştirildi`);
     }
 
     shufflePots(comp) {
@@ -2484,80 +2361,8 @@ class FootballSimulation {
         return activeTab ? activeTab.dataset.competition : null;
     }
 
-    // Drag and drop için event handlers
     initDragAndDrop() {
-        const self = this;
-        
-        // Global drag events
-        document.addEventListener('dragstart', (e) => {
-            if (e.target.classList.contains('pot-team')) {
-                e.dataTransfer.setData('text/plain', JSON.stringify({
-                    team: e.target.dataset.team,
-                    league: e.target.dataset.league,
-                    sourcePot: e.target.closest('.pot-section').dataset.pot
-                }));
-                e.target.style.opacity = '0.5';
-                e.target.classList.add('dragging');
-            }
-        });
-
-        document.addEventListener('dragend', (e) => {
-            if (e.target.classList.contains('pot-team')) {
-                e.target.style.opacity = '1';
-                e.target.classList.remove('dragging');
-                
-                // Tüm drag-over class'larını temizle
-                document.querySelectorAll('.pot-teams').forEach(el => {
-                    el.classList.remove('drag-over');
-                    el.style.backgroundColor = '';
-                });
-            }
-        });
-
-        document.addEventListener('dragover', (e) => {
-            if (e.target.classList.contains('pot-teams')) {
-                e.preventDefault();
-                e.target.classList.add('drag-over');
-                e.target.style.backgroundColor = '#f0f4ff';
-            }
-        });
-
-        document.addEventListener('dragleave', (e) => {
-            if (e.target.classList.contains('pot-teams')) {
-                e.target.classList.remove('drag-over');
-                e.target.style.backgroundColor = '';
-            }
-        });
-
-        document.addEventListener('drop', (e) => {
-            if (e.target.classList.contains('pot-teams')) {
-                e.preventDefault();
-                e.target.classList.remove('drag-over');
-                e.target.style.backgroundColor = '';
-                
-                try {
-                    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                    const targetPot = parseInt(e.target.closest('.pot-section').dataset.pot);
-                    
-                    if (targetPot !== parseInt(data.sourcePot)) {
-                        self.currentMoveTeam = data.team;
-                        self.currentMovePot = parseInt(data.sourcePot);
-                        document.getElementById('targetPot').value = targetPot;
-                        document.getElementById('moveTeamName').textContent = `Takım: ${data.team}`;
-                        document.getElementById('moveTeamModal').style.display = 'block';
-                    }
-                } catch (error) {
-                    console.error('Drag and drop error:', error);
-                }
-            }
-        });
-        
-        // Modal kapatma
-        document.addEventListener('click', (e) => {
-            if (e.target.id === 'moveTeamModal') {
-                self.closeMoveModal();
-            }
-        });
+        // Drag-drop kaldırıldı, tıkla-tıkla swap sistemi kullanılıyor
     }
 
     // Seçili takımı göster
