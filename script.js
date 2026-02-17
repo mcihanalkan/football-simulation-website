@@ -11,32 +11,65 @@ class FootballSimulation {
         this.settings = JSON.parse(localStorage.getItem('settings')) || this.getDefaultSettings();
         this.currentSeason = this.getCurrentSeason();
         
-        this.leagues = {
-            'La Liga': { country: 'Spain', teams: 20, matches: 38, coefficient: 23.4, flag: '🇪🇸' },
-            'Bundesliga': { country: 'Germany', teams: 18, matches: 34, coefficient: 19.2, flag: '🇩🇪' },
-            'Premier League': { country: 'England', teams: 20, matches: 38, coefficient: 19.1, flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
-            'Serie A': { country: 'Italy', teams: 20, matches: 38, coefficient: 18.3, flag: '🇮🇹' },
-            'Süper Lig': { country: 'Turkey', teams: 18, matches: 34, coefficient: 18.0, flag: '🇹🇷' },
-            'Ligue 1': { country: 'France', teams: 18, matches: 34, coefficient: 15.3, flag: '🇫🇷' },
-            'Liga Portugal': { country: 'Portugal', teams: 8, matches: 14, coefficient: 15.2, flag: '🇵🇹' },
-            'Scottish Premiership': { country: 'Scotland', teams: 12, matches: 22, coefficient: 12.0, flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿' },
-            'Czech First League': { country: 'Czech Republic', teams: 16, matches: 30, coefficient: 11.6, flag: '🇨🇿' },
-            'Belgium Pro League': { country: 'Belgium', teams: 8, matches: 14, coefficient: 11.2, flag: '🇧🇪' },
-            'Super League Greece': { country: 'Greece', teams: 14, matches: 26, coefficient: 10.5, flag: '🇬🇷' },
-            'Austrian Bundesliga': { country: 'Austria', teams: 12, matches: 22, coefficient: 10.0, flag: '🇦🇹' },
-            'Danish Superliga': { country: 'Denmark', teams: 12, matches: 22, coefficient: 8.7, flag: '🇩🇰' },
-            'Ukrainian Premier League': { country: 'Ukraine', teams: 16, matches: 30, coefficient: 8.5, flag: '🇺🇦' },
-            'Swiss Super League': { country: 'Switzerland', teams: 12, matches: 22, coefficient: 8.3, flag: '🇨🇭' },
-            'Allsvenskan': { country: 'Sweden', teams: 16, matches: 30, coefficient: 8.3, flag: '🇸🇪' },
-            'Eredivisie': { country: 'Netherlands', teams: 8, matches: 14, coefficient: 7.5, flag: '🇳🇱' },
-            'Cypriot First Division': { country: 'Cyprus', teams: 12, matches: 22, coefficient: 6.7, flag: '🇨🇾' },
-            'Ekstraklasa': { country: 'Poland', teams: 18, matches: 34, coefficient: 6.0, flag: '🇵🇱' },
-            'Eliteserien': { country: 'Norway', teams: 16, matches: 30, coefficient: 6.0, flag: '🇳🇴' },
-            'NB I': { country: 'Hungary', teams: 12, matches: 22, coefficient: 5.3, flag: '🇭🇺' },
-            'HNL': { country: 'Croatia', teams: 10, matches: 18, coefficient: 4.3, flag: '🇭🇷' },
-            'Liga 1': { country: 'Romania', teams: 16, matches: 30, coefficient: 4.3, flag: '🇷🇴' },
-            'SuperLiga': { country: 'Serbia', teams: 16, matches: 30, coefficient: 3.5, flag: '🇷🇸' }
+        // Tek katsayı listesi (kullanıcı verisi) - sıra: 1-24
+        this.coefficientRanking = [
+            { country: 'Spain', countryTr: 'İspanya', coefficient: 23.4, flag: '🇪🇸' },
+            { country: 'Germany', countryTr: 'Almanya', coefficient: 19.2, flag: '🇩🇪' },
+            { country: 'England', countryTr: 'İngiltere', coefficient: 19.1, flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+            { country: 'Italy', countryTr: 'İtalya', coefficient: 18.3, flag: '🇮🇹' },
+            { country: 'Turkey', countryTr: 'Türkiye', coefficient: 18.0, flag: '🇹🇷' },
+            { country: 'France', countryTr: 'Fransa', coefficient: 15.3, flag: '🇫🇷' },
+            { country: 'Portugal', countryTr: 'Portekiz', coefficient: 15.2, flag: '🇵🇹' },
+            { country: 'Scotland', countryTr: 'İskoçya', coefficient: 12.0, flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿' },
+            { country: 'Czech Republic', countryTr: 'Çekya', coefficient: 11.6, flag: '🇨🇿' },
+            { country: 'Belgium', countryTr: 'Belçika', coefficient: 11.2, flag: '🇧🇪' },
+            { country: 'Greece', countryTr: 'Yunanistan', coefficient: 10.5, flag: '🇬🇷' },
+            { country: 'Austria', countryTr: 'Avusturya', coefficient: 10.0, flag: '🇦🇹' },
+            { country: 'Denmark', countryTr: 'Danimarka', coefficient: 8.7, flag: '🇩🇰' },
+            { country: 'Ukraine', countryTr: 'Ukrayna', coefficient: 8.5, flag: '🇺🇦' },
+            { country: 'Switzerland', countryTr: 'İsviçre', coefficient: 8.3, flag: '🇨🇭' },
+            { country: 'Sweden', countryTr: 'İsveç', coefficient: 8.3, flag: '🇸🇪' },
+            { country: 'Netherlands', countryTr: 'Hollanda', coefficient: 7.5, flag: '🇳🇱' },
+            { country: 'Cyprus', countryTr: 'Kıbrıs', coefficient: 6.7, flag: '🇨🇾' },
+            { country: 'Poland', countryTr: 'Polonya', coefficient: 6.0, flag: '🇵🇱' },
+            { country: 'Norway', countryTr: 'Norveç', coefficient: 6.0, flag: '🇳🇴' },
+            { country: 'Hungary', countryTr: 'Macaristan', coefficient: 5.3, flag: '🇭🇺' },
+            { country: 'Croatia', countryTr: 'Hırvatistan', coefficient: 4.3, flag: '🇭🇷' },
+            { country: 'Romania', countryTr: 'Romanya', coefficient: 4.3, flag: '🇷🇴' },
+            { country: 'Serbia', countryTr: 'Sırbistan', coefficient: 3.5, flag: '🇷🇸' }
+        ];
+
+        // Lig -> ülke eşlemesi (katsayı listesindeki ülke adı)
+        this.leagueToCountry = {
+            'La Liga': 'Spain', 'Bundesliga': 'Germany', 'Premier League': 'England', 'Serie A': 'Italy',
+            'Süper Lig': 'Turkey', 'Ligue 1': 'France', 'Liga Portugal': 'Portugal', 'Scottish Premiership': 'Scotland',
+            'Czech First League': 'Czech Republic', 'Belgium Pro League': 'Belgium', 'Super League Greece': 'Greece',
+            'Austrian Bundesliga': 'Austria', 'Danish Superliga': 'Denmark', 'Ukrainian Premier League': 'Ukraine',
+            'Swiss Super League': 'Switzerland', 'Allsvenskan': 'Sweden', 'Eredivisie': 'Netherlands',
+            'Cypriot First Division': 'Cyprus', 'Ekstraklasa': 'Poland', 'Eliteserien': 'Norway', 'NB I': 'Hungary',
+            'HNL': 'Croatia', 'Liga 1': 'Romania', 'SuperLiga': 'Serbia'
         };
+
+        // Büyük 6 lig: 20/18 takım; diğer tüm ligler: 8 takım
+        this.leagues = {};
+        const big6 = ['La Liga', 'Premier League', 'Serie A', 'Bundesliga', 'Süper Lig', 'Ligue 1'];
+        const big6Teams = [20, 20, 20, 18, 18, 18];
+        const big6Matches = [38, 38, 38, 34, 34, 34];
+        Object.keys(this.leagueToCountry).forEach(leagueName => {
+            const country = this.leagueToCountry[leagueName];
+            const row = this.coefficientRanking.find(r => r.country === country);
+            if (row) {
+                const i = big6.indexOf(leagueName);
+                const isBig6 = i >= 0;
+                this.leagues[leagueName] = {
+                    country: row.country,
+                    teams: isBig6 ? big6Teams[i] : 8,
+                    matches: isBig6 ? big6Matches[i] : 14,
+                    coefficient: row.coefficient,
+                    flag: row.flag
+                };
+            }
+        });
 
         this.europeanCompetitions = {
             'UCL': { name: 'Champions League', stages: ['Group', 'R16', 'QF', 'SF', 'Final', 'Winner'] },
@@ -44,42 +77,45 @@ class FootballSimulation {
             'UECL': { name: 'Conference League', stages: ['Group', 'R16', 'QF', 'SF', 'Final', 'Winner'] }
         };
 
-        // New detailed European point system
+        // Avrupa puanları: aşama -> puan (Son 16(D)=direkt, Son 16(S)=playoff geçen, Son 24=playoff elenen)
         this.europeanPoints = {
             'UCL': {
                 'Winner': 34, 'Final': 31, 'SF': 28, 'QF': 25,
-                'R16_Direct': 22, 'R16_Playoff': 20, 'R24_Playoff': 17,
-                'Group_25_26': 10, 'Group_27_28': 9, 'Group_29_30': 8,
-                'Group_31_33': 7, 'Group_34_36': 6
+                'R16_Direct': 22, 'R16_Playoff': 20, 'R24': 17,
+                'Group_25_26': 10, 'Group_27_28': 9, 'Group_29_30': 8, 'Group_31_33': 7, 'Group_34_36': 6
             },
             'UEL': {
                 'Winner': 30, 'Final': 27, 'SF': 24, 'QF': 21,
-                'R16_Direct': 18, 'R16_Playoff': 16, 'R24_Playoff': 13,
+                'R16_Direct': 18, 'R16_Playoff': 16, 'R24': 13,
                 'Group_25_28': 6, 'Group_29_32': 5, 'Group_33_36': 4
             },
             'UECL': {
                 'Winner': 27, 'Final': 24, 'SF': 21, 'QF': 18,
-                'R16_Direct': 15, 'R16_Playoff': 13, 'R24_Playoff': 10,
+                'R16_Direct': 15, 'R16_Playoff': 13, 'R24': 10,
                 'Group_25_28': 4, 'Group_29_32': 3, 'Group_33_36': 2
             }
         };
-
-        // European qualification allocation by country coefficient ranking
-        this.europeanAllocation = {
-            'UCL': {
-                1: 5, 2: 5, 3: 4, 4: 4, 5: 3, 6: 3,
-                7: 2, 8: 2, 9: 2, 10: 2, 11: 1, 12: 1, 13: 1, 14: 1
-            },
-            'UEL': {
-                1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 2, 9: 2, 10: 2, 11: 2, 12: 2,
-                13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 19: 1, 20: 1, 21: 1, 22: 1, 23: 1, 24: 1
-            },
-            'UECL': {
-                1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1,
-                11: 2, 12: 1, 13: 2, 14: 2, 15: 3, 16: 2, 17: 2, 18: 2, 19: 2, 20: 2, 21: 2, 22: 2,
-                23: 1, 24: 1
-            }
+        this.europeanStageLabels = {
+            'Winner': 'Şampiyon', 'Final': 'Final', 'SF': 'Yarı Final', 'QF': 'Çeyrek Final',
+            'R16_Direct': 'Son 16(D)', 'R16_Playoff': 'Son 16(S)', 'R24': 'Son 24',
+            'Group_25_26': 'Lig 25-26', 'Group_27_28': 'Lig 27-28', 'Group_29_30': 'Lig 29-30',
+            'Group_31_33': 'Lig 31-33', 'Group_34_36': 'Lig 34-36',
+            'Group_25_28': 'Lig 25-28', 'Group_29_32': 'Lig 29-32', 'Group_33_36': 'Lig 33-36'
         };
+
+        // Kontenjanlar: UCL 1-2: 5er, 3-4: 4er, 5-6: 3er, 7-10: 2şer, 11-14: 1er | UEL 1-12: 2şer, 13-24: 1er | UECL 1-10: 1er, 11: 2, 12: 1, 13-14: 2şer, 15: 3, 16-22: 2şer, 23-24: 1er
+        this.europeanAllocation = {
+            'UCL': { 1: 5, 2: 5, 3: 4, 4: 4, 5: 3, 6: 3, 7: 2, 8: 2, 9: 2, 10: 2, 11: 1, 12: 1, 13: 1, 14: 1, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0, 23: 0, 24: 0 },
+            'UEL': { 1: 2, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 2, 9: 2, 10: 2, 11: 2, 12: 2, 13: 1, 14: 1, 15: 1, 16: 1, 17: 1, 18: 1, 19: 1, 20: 1, 21: 1, 22: 1, 23: 1, 24: 1 },
+            'UECL': { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1, 11: 2, 12: 1, 13: 2, 14: 2, 15: 3, 16: 2, 17: 2, 18: 2, 19: 2, 20: 2, 21: 2, 22: 2, 23: 1, 24: 1 }
+        };
+
+        // 2028-29 Avrupa katılımcıları (lig sıralamasına göre doldurulacak)
+        this.europeanSeason2028_29 = JSON.parse(localStorage.getItem('europeanSeason2028_29')) || { UCL: [], UEL: [], UECL: [] };
+
+        // Oynanabilir Avrupa kupası: grup (4 torba, 8 maç), playoff kura, Son 16 kura, eleme
+        this.europeanPlayable = JSON.parse(localStorage.getItem('europeanPlayable')) || {};
+        // Örnek yapı: { UCL: { participants: [], pots: {1:[],2:[],3:[],4:[]}, groupMatches: [], groupStandings: [], phase: 'group'|'playoff_draw'|'playoff'|'r16_draw'|'r16'|'qf'|'sf'|'final'|'done', playoffPairs: [], playoffResults: [], r16Pairs: [], knockoutResults: {} } }
 
         // Initialize fixture viewing state
         this.currentFixtureWeek = 1;
@@ -103,10 +139,43 @@ class FootballSimulation {
 
     init() {
         this.setupEventListeners();
+        this.populateLeagueDropdowns();
         this.updateStats();
         this.loadDefaultTeams();
         this.renderTeams();
         this.renderDashboard();
+    }
+
+    populateLeagueDropdowns() {
+        const names = Object.keys(this.leagues);
+        if (names.length === 0) return;
+        const makeOpt = (val, label) => `<option value="${val}">${this.leagues[val]?.flag || ''} ${label || val}</option>`;
+        const selects = [
+            { id: 'league-filter', first: '<option value="">Tüm Ligler</option>' },
+            { id: 'fixture-league', first: '<option value="">Lig Seçin</option>' },
+            { id: 'team-league', first: '<option value="">Lig Seçin</option>' },
+            { id: 'edit-team-league', first: '<option value="">Lig Seçin</option>' },
+            { id: 'team-points-league', first: '<option value="">Tüm Ligler</option>' }
+        ];
+        selects.forEach(({ id, first }) => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = first + names.map(l => makeOpt(l)).join('');
+        });
+    }
+
+    renderLeagueTabs() {
+        const container = document.getElementById('league-tabs-container');
+        if (!container) return;
+        const names = Object.keys(this.leagues);
+        container.innerHTML = names.map((leagueName, i) =>
+            `<button class="league-tab ${i === 0 ? 'active' : ''}" data-league="${leagueName}">${this.leagues[leagueName]?.flag || ''} ${leagueName}</button>`
+        ).join('');
+        container.querySelectorAll('.league-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                const league = e.target.closest('.league-tab').dataset.league;
+                this.showLeagueTable(league);
+            });
+        });
     }
 
     // Event Listeners
@@ -209,10 +278,12 @@ class FootballSimulation {
         // Load section-specific data
         switch (sectionName) {
             case 'teams':
+                this.populateLeagueDropdowns();
                 this.renderTeams();
                 break;
             case 'leagues':
-                this.showLeagueTable('La Liga');
+                this.renderLeagueTabs();
+                this.showLeagueTable(Object.keys(this.leagues)[0] || 'La Liga');
                 break;
             case 'seasons':
                 this.renderSeasonProgress();
@@ -237,6 +308,18 @@ class FootballSimulation {
         localStorage.setItem('matches', JSON.stringify(this.matches));
         localStorage.setItem('europeanResults', JSON.stringify(this.europeanResults));
         localStorage.setItem('countryCoefficients', JSON.stringify(this.countryCoefficients));
+        localStorage.setItem('europeanSeason2028_29', JSON.stringify(this.europeanSeason2028_29));
+        localStorage.setItem('europeanPlayable', JSON.stringify(this.europeanPlayable));
+    }
+
+    // Reyting 0.5-9.9 dışındaki eski değerleri dönüştür
+    normalizeRating(r) {
+        if (r == null || r === undefined) return 7.0;
+        const n = typeof r === 'string' ? parseFloat(String(r).replace(',', '.')) : Number(r);
+        if (isNaN(n)) return 7.0;
+        if (n >= 0.5 && n <= 9.9) return Math.round(n * 10) / 10;
+        if (n > 20) return Math.min(9.9, Math.max(0.5, (n - 1500) / 1500 * 4.9 + 5)); // Eski 1500-3000 ölçeği
+        return Math.max(0.5, Math.min(9.9, n));
     }
 
     saveSettings() {
@@ -258,9 +341,20 @@ class FootballSimulation {
         }
     }
 
+    // 8 takımlı lig için 0.5-9.9 reytingli takım listesi üretir
+    makeLeague8(leagueName, country, teamNames, baseRating = 7.0) {
+        const step = 0.4;
+        return teamNames.slice(0, 8).map((name, i) => ({
+            name,
+            league: leagueName,
+            country,
+            rating: Math.max(0.5, Math.min(9.9, baseRating - i * step + (Math.random() * 0.2 - 0.1)))
+        })).map(t => ({ ...t, rating: Math.round(t.rating * 10) / 10 }));
+    }
+
     initializeDefaultTeams() {
         const defaultTeams = [
-            // Premier League (ratings converted to 0.5-9.9 scale)
+            // Premier League - 20 takım, 0.5-9.9
             { name: 'Manchester City', league: 'Premier League', country: 'England', rating: 9.5 },
             { name: 'Arsenal', league: 'Premier League', country: 'England', rating: 9.2 },
             { name: 'Liverpool', league: 'Premier League', country: 'England', rating: 9.0 },
@@ -304,70 +398,68 @@ class FootballSimulation {
             { name: 'Granada', league: 'La Liga', country: 'Spain', rating: 5.4 },
             { name: 'Almeria', league: 'La Liga', country: 'Spain', rating: 5.2 },
 
-            // Serie A (ratings converted to 0.5-9.9 scale)
+            // Serie A - 20 takım, 0.5-9.9
             { name: 'Inter Milan', league: 'Serie A', country: 'Italy', rating: 9.3 },
             { name: 'Juventus', league: 'Serie A', country: 'Italy', rating: 9.2 },
-            { name: 'AC Milan', league: 'Serie A', country: 'Italy', rating: 2650 },
-            { name: 'Napoli', league: 'Serie A', country: 'Italy', rating: 2600 },
-            { name: 'AS Roma', league: 'Serie A', country: 'Italy', rating: 2550 },
-            { name: 'Lazio', league: 'Serie A', country: 'Italy', rating: 2500 },
-            { name: 'Atalanta', league: 'Serie A', country: 'Italy', rating: 2450 },
-            { name: 'Fiorentina', league: 'Serie A', country: 'Italy', rating: 2400 },
-            { name: 'Bologna', league: 'Serie A', country: 'Italy', rating: 2350 },
-            { name: 'Torino', league: 'Serie A', country: 'Italy', rating: 2300 },
-            { name: 'Monza', league: 'Serie A', country: 'Italy', rating: 2250 },
-            { name: 'Genoa', league: 'Serie A', country: 'Italy', rating: 2200 },
-            { name: 'Lecce', league: 'Serie A', country: 'Italy', rating: 2150 },
-            { name: 'Verona', league: 'Serie A', country: 'Italy', rating: 2100 },
-            { name: 'Udinese', league: 'Serie A', country: 'Italy', rating: 2050 },
-            { name: 'Cagliari', league: 'Serie A', country: 'Italy', rating: 2000 },
-            { name: 'Empoli', league: 'Serie A', country: 'Italy', rating: 1950 },
-            { name: 'Frosinone', league: 'Serie A', country: 'Italy', rating: 1900 },
-            { name: 'Sassuolo', league: 'Serie A', country: 'Italy', rating: 1850 },
-            { name: 'Salernitana', league: 'Serie A', country: 'Italy', rating: 1800 },
+            { name: 'AC Milan', league: 'Serie A', country: 'Italy', rating: 8.9 },
+            { name: 'Napoli', league: 'Serie A', country: 'Italy', rating: 8.8 },
+            { name: 'AS Roma', league: 'Serie A', country: 'Italy', rating: 8.6 },
+            { name: 'Lazio', league: 'Serie A', country: 'Italy', rating: 8.4 },
+            { name: 'Atalanta', league: 'Serie A', country: 'Italy', rating: 8.2 },
+            { name: 'Fiorentina', league: 'Serie A', country: 'Italy', rating: 8.0 },
+            { name: 'Bologna', league: 'Serie A', country: 'Italy', rating: 7.8 },
+            { name: 'Torino', league: 'Serie A', country: 'Italy', rating: 7.6 },
+            { name: 'Monza', league: 'Serie A', country: 'Italy', rating: 7.4 },
+            { name: 'Genoa', league: 'Serie A', country: 'Italy', rating: 7.2 },
+            { name: 'Lecce', league: 'Serie A', country: 'Italy', rating: 7.0 },
+            { name: 'Verona', league: 'Serie A', country: 'Italy', rating: 6.8 },
+            { name: 'Udinese', league: 'Serie A', country: 'Italy', rating: 6.6 },
+            { name: 'Cagliari', league: 'Serie A', country: 'Italy', rating: 6.4 },
+            { name: 'Empoli', league: 'Serie A', country: 'Italy', rating: 6.2 },
+            { name: 'Frosinone', league: 'Serie A', country: 'Italy', rating: 6.0 },
+            { name: 'Sassuolo', league: 'Serie A', country: 'Italy', rating: 5.8 },
+            { name: 'Salernitana', league: 'Serie A', country: 'Italy', rating: 5.6 },
 
-            // Bundesliga
-            { name: 'Bayern Munich', league: 'Bundesliga', country: 'Germany', rating: 2850 },
-            { name: 'Borussia Dortmund', league: 'Bundesliga', country: 'Germany', rating: 2700 },
-            { name: 'RB Leipzig', league: 'Bundesliga', country: 'Germany', rating: 2600 },
-            { name: 'Bayer Leverkusen', league: 'Bundesliga', country: 'Germany', rating: 2550 },
-            { name: 'Eintracht Frankfurt', league: 'Bundesliga', country: 'Germany', rating: 2500 },
-            { name: 'VfB Stuttgart', league: 'Bundesliga', country: 'Germany', rating: 2450 },
-            { name: 'Borussia Monchengladbach', league: 'Bundesliga', country: 'Germany', rating: 2400 },
-            { name: 'Union Berlin', league: 'Bundesliga', country: 'Germany', rating: 2350 },
-            { name: 'SC Freiburg', league: 'Bundesliga', country: 'Germany', rating: 2300 },
-            { name: '1. FC Koln', league: 'Bundesliga', country: 'Germany', rating: 2250 },
-            { name: 'VfL Wolfsburg', league: 'Bundesliga', country: 'Germany', rating: 2200 },
-            { name: 'Werder Bremen', league: 'Bundesliga', country: 'Germany', rating: 2150 },
-            { name: 'FC Augsburg', league: 'Bundesliga', country: 'Germany', rating: 2100 },
-            { name: 'Mainz 05', league: 'Bundesliga', country: 'Germany', rating: 2050 },
-            { name: 'Hoffenheim', league: 'Bundesliga', country: 'Germany', rating: 2000 },
-            { name: 'VfL Bochum', league: 'Bundesliga', country: 'Germany', rating: 1950 },
-            { name: 'FC Heidenheim', league: 'Bundesliga', country: 'Germany', rating: 1900 },
-            { name: 'SV Darmstadt', league: 'Bundesliga', country: 'Germany', rating: 1850 },
+            // Bundesliga - 18 takım, 0.5-9.9
+            { name: 'Bayern Munich', league: 'Bundesliga', country: 'Germany', rating: 9.5 },
+            { name: 'Borussia Dortmund', league: 'Bundesliga', country: 'Germany', rating: 9.2 },
+            { name: 'RB Leipzig', league: 'Bundesliga', country: 'Germany', rating: 8.8 },
+            { name: 'Bayer Leverkusen', league: 'Bundesliga', country: 'Germany', rating: 8.6 },
+            { name: 'Eintracht Frankfurt', league: 'Bundesliga', country: 'Germany', rating: 8.4 },
+            { name: 'VfB Stuttgart', league: 'Bundesliga', country: 'Germany', rating: 8.2 },
+            { name: 'Union Berlin', league: 'Bundesliga', country: 'Germany', rating: 8.0 },
+            { name: 'SC Freiburg', league: 'Bundesliga', country: 'Germany', rating: 7.8 },
+            { name: '1. FC Koln', league: 'Bundesliga', country: 'Germany', rating: 7.6 },
+            { name: 'VfL Wolfsburg', league: 'Bundesliga', country: 'Germany', rating: 7.4 },
+            { name: 'Werder Bremen', league: 'Bundesliga', country: 'Germany', rating: 7.2 },
+            { name: 'FC Augsburg', league: 'Bundesliga', country: 'Germany', rating: 7.0 },
+            { name: 'Mainz 05', league: 'Bundesliga', country: 'Germany', rating: 6.8 },
+            { name: 'Hoffenheim', league: 'Bundesliga', country: 'Germany', rating: 6.6 },
+            { name: 'VfL Bochum', league: 'Bundesliga', country: 'Germany', rating: 6.4 },
+            { name: 'FC Heidenheim', league: 'Bundesliga', country: 'Germany', rating: 6.2 },
+            { name: 'SV Darmstadt', league: 'Bundesliga', country: 'Germany', rating: 6.0 },
 
-            // Ligue 1
-            { name: 'Paris Saint-Germain', league: 'Ligue 1', country: 'France', rating: 2800 },
-            { name: 'AS Monaco', league: 'Ligue 1', country: 'France', rating: 2550 },
-            { name: 'Marseille', league: 'Ligue 1', country: 'France', rating: 2500 },
-            { name: 'Lyon', league: 'Ligue 1', country: 'France', rating: 2450 },
-            { name: 'Nice', league: 'Ligue 1', country: 'France', rating: 2400 },
-            { name: 'Lille', league: 'Ligue 1', country: 'France', rating: 2350 },
-            { name: 'Rennes', league: 'Ligue 1', country: 'France', rating: 2300 },
-            { name: 'Lens', league: 'Ligue 1', country: 'France', rating: 2250 },
-            { name: 'Montpellier', league: 'Ligue 1', country: 'France', rating: 2200 },
-            { name: 'Reims', league: 'Ligue 1', country: 'France', rating: 2150 },
-            { name: 'Strasbourg', league: 'Ligue 1', country: 'France', rating: 2100 },
-            { name: 'Nantes', league: 'Ligue 1', country: 'France', rating: 2050 },
-            { name: 'Brest', league: 'Ligue 1', country: 'France', rating: 2000 },
-            { name: 'Le Havre', league: 'Ligue 1', country: 'France', rating: 1950 },
-            { name: 'Toulouse', league: 'Ligue 1', country: 'France', rating: 1900 },
-            { name: 'Metz', league: 'Ligue 1', country: 'France', rating: 1850 },
-            { name: 'Lorient', league: 'Ligue 1', country: 'France', rating: 1800 },
-            { name: 'Clermont', league: 'Ligue 1', country: 'France', rating: 1750 }
+            // Ligue 1 - 18 takım, 0.5-9.9
+            { name: 'Paris Saint-Germain', league: 'Ligue 1', country: 'France', rating: 9.4 },
+            { name: 'AS Monaco', league: 'Ligue 1', country: 'France', rating: 8.8 },
+            { name: 'Marseille', league: 'Ligue 1', country: 'France', rating: 8.6 },
+            { name: 'Lyon', league: 'Ligue 1', country: 'France', rating: 8.4 },
+            { name: 'Nice', league: 'Ligue 1', country: 'France', rating: 8.2 },
+            { name: 'Lille', league: 'Ligue 1', country: 'France', rating: 8.0 },
+            { name: 'Rennes', league: 'Ligue 1', country: 'France', rating: 7.8 },
+            { name: 'Lens', league: 'Ligue 1', country: 'France', rating: 7.6 },
+            { name: 'Montpellier', league: 'Ligue 1', country: 'France', rating: 7.4 },
+            { name: 'Reims', league: 'Ligue 1', country: 'France', rating: 7.2 },
+            { name: 'Strasbourg', league: 'Ligue 1', country: 'France', rating: 7.0 },
+            { name: 'Nantes', league: 'Ligue 1', country: 'France', rating: 6.8 },
+            { name: 'Brest', league: 'Ligue 1', country: 'France', rating: 6.6 },
+            { name: 'Le Havre', league: 'Ligue 1', country: 'France', rating: 6.4 },
+            { name: 'Toulouse', league: 'Ligue 1', country: 'France', rating: 6.2 },
+            { name: 'Metz', league: 'Ligue 1', country: 'France', rating: 6.0 },
+            { name: 'Lorient', league: 'Ligue 1', country: 'France', rating: 5.8 },
+            { name: 'Clermont', league: 'Ligue 1', country: 'France', rating: 5.6 }
         ];
 
-        // Shorter leagues (ratings converted to 0.5-9.9 scale)
         const portugalTeams = [
             { name: 'Benfica', league: 'Liga Portugal', country: 'Portugal', rating: 9.0 },
             { name: 'FC Porto', league: 'Liga Portugal', country: 'Portugal', rating: 8.8 },
@@ -380,35 +472,35 @@ class FootballSimulation {
         ];
 
         const eredivisieTeams = [
-            { name: 'Ajax', league: 'Eredivisie', country: 'Netherlands', rating: 2600 },
-            { name: 'PSV Eindhoven', league: 'Eredivisie', country: 'Netherlands', rating: 2650 },
-            { name: 'Feyenoord', league: 'Eredivisie', country: 'Netherlands', rating: 2550 },
-            { name: 'AZ Alkmaar', league: 'Eredivisie', country: 'Netherlands', rating: 2400 },
-            { name: 'FC Twente', league: 'Eredivisie', country: 'Netherlands', rating: 2250 },
-            { name: 'Utrecht', league: 'Eredivisie', country: 'Netherlands', rating: 2100 },
-            { name: 'Vitesse', league: 'Eredivisie', country: 'Netherlands', rating: 2000 },
-            { name: 'Go Ahead Eagles', league: 'Eredivisie', country: 'Netherlands', rating: 1900 }
+            { name: 'PSV Eindhoven', league: 'Eredivisie', country: 'Netherlands', rating: 8.8 },
+            { name: 'Ajax', league: 'Eredivisie', country: 'Netherlands', rating: 8.6 },
+            { name: 'Feyenoord', league: 'Eredivisie', country: 'Netherlands', rating: 8.4 },
+            { name: 'AZ Alkmaar', league: 'Eredivisie', country: 'Netherlands', rating: 7.8 },
+            { name: 'FC Twente', league: 'Eredivisie', country: 'Netherlands', rating: 7.4 },
+            { name: 'Utrecht', league: 'Eredivisie', country: 'Netherlands', rating: 7.0 },
+            { name: 'Vitesse', league: 'Eredivisie', country: 'Netherlands', rating: 6.6 },
+            { name: 'Go Ahead Eagles', league: 'Eredivisie', country: 'Netherlands', rating: 6.2 }
         ];
 
         const superLigTeams = [
-            { name: 'Galatasaray', league: 'Süper Lig', country: 'Turkey', rating: 2500 },
-            { name: 'Fenerbahce', league: 'Süper Lig', country: 'Turkey', rating: 2450 },
-            { name: 'Besiktas', league: 'Süper Lig', country: 'Turkey', rating: 2400 },
-            { name: 'Trabzonspor', league: 'Süper Lig', country: 'Turkey', rating: 2300 },
-            { name: 'Basaksehir', league: 'Süper Lig', country: 'Turkey', rating: 2200 },
-            { name: 'Sivasspor', league: 'Süper Lig', country: 'Turkey', rating: 2100 },
-            { name: 'Adana Demirspor', league: 'Süper Lig', country: 'Turkey', rating: 2000 },
-            { name: 'Antalyaspor', league: 'Süper Lig', country: 'Turkey', rating: 1950 },
-            { name: 'Alanyaspor', league: 'Süper Lig', country: 'Turkey', rating: 1900 },
-            { name: 'Kasimpasa', league: 'Süper Lig', country: 'Turkey', rating: 1850 },
-            { name: 'Konyaspor', league: 'Süper Lig', country: 'Turkey', rating: 1800 },
-            { name: 'Gaziantep FK', league: 'Süper Lig', country: 'Turkey', rating: 1750 },
-            { name: 'Kayserispor', league: 'Süper Lig', country: 'Turkey', rating: 1700 },
-            { name: 'Rizespor', league: 'Süper Lig', country: 'Turkey', rating: 1650 },
-            { name: 'Hatayspor', league: 'Süper Lig', country: 'Turkey', rating: 1600 },
-            { name: 'Fatih Karagumruk', league: 'Süper Lig', country: 'Turkey', rating: 1550 },
-            { name: 'Pendikspor', league: 'Süper Lig', country: 'Turkey', rating: 1500 },
-            { name: 'Istanbulspor', league: 'Süper Lig', country: 'Turkey', rating: 1450 }
+            { name: 'Galatasaray', league: 'Süper Lig', country: 'Turkey', rating: 8.6 },
+            { name: 'Fenerbahce', league: 'Süper Lig', country: 'Turkey', rating: 8.4 },
+            { name: 'Besiktas', league: 'Süper Lig', country: 'Turkey', rating: 8.2 },
+            { name: 'Trabzonspor', league: 'Süper Lig', country: 'Turkey', rating: 7.8 },
+            { name: 'Basaksehir', league: 'Süper Lig', country: 'Turkey', rating: 7.4 },
+            { name: 'Sivasspor', league: 'Süper Lig', country: 'Turkey', rating: 7.0 },
+            { name: 'Adana Demirspor', league: 'Süper Lig', country: 'Turkey', rating: 6.6 },
+            { name: 'Antalyaspor', league: 'Süper Lig', country: 'Turkey', rating: 6.4 },
+            { name: 'Alanyaspor', league: 'Süper Lig', country: 'Turkey', rating: 6.2 },
+            { name: 'Kasimpasa', league: 'Süper Lig', country: 'Turkey', rating: 6.0 },
+            { name: 'Konyaspor', league: 'Süper Lig', country: 'Turkey', rating: 5.8 },
+            { name: 'Gaziantep FK', league: 'Süper Lig', country: 'Turkey', rating: 5.6 },
+            { name: 'Kayserispor', league: 'Süper Lig', country: 'Turkey', rating: 5.4 },
+            { name: 'Rizespor', league: 'Süper Lig', country: 'Turkey', rating: 5.2 },
+            { name: 'Hatayspor', league: 'Süper Lig', country: 'Turkey', rating: 5.0 },
+            { name: 'Fatih Karagumruk', league: 'Süper Lig', country: 'Turkey', rating: 4.8 },
+            { name: 'Pendikspor', league: 'Süper Lig', country: 'Turkey', rating: 4.6 },
+            { name: 'Istanbulspor', league: 'Süper Lig', country: 'Turkey', rating: 4.4 }
         ];
 
         const belgiumTeams = [
@@ -431,14 +523,10 @@ class FootballSimulation {
             { name: 'Hibernian', league: 'Scottish Premiership', country: 'Scotland', rating: 6.4 },
             { name: 'Motherwell', league: 'Scottish Premiership', country: 'Scotland', rating: 6.2 },
             { name: 'St Mirren', league: 'Scottish Premiership', country: 'Scotland', rating: 6.0 },
-            { name: 'Dundee United', league: 'Scottish Premiership', country: 'Scotland', rating: 5.8 },
-            { name: 'St Johnstone', league: 'Scottish Premiership', country: 'Scotland', rating: 5.6 },
-            { name: 'Ross County', league: 'Scottish Premiership', country: 'Scotland', rating: 5.4 },
-            { name: 'Kilmarnock', league: 'Scottish Premiership', country: 'Scotland', rating: 5.2 },
-            { name: 'Livingston', league: 'Scottish Premiership', country: 'Scotland', rating: 5.0 }
+            { name: 'Dundee United', league: 'Scottish Premiership', country: 'Scotland', rating: 5.8 }
         ];
 
-        // Czech First League Teams
+        // Czech First League - 8 takım
         const czechTeams = [
             { name: 'Slavia Prague', league: 'Czech First League', country: 'Czech Republic', rating: 7.5 },
             { name: 'Sparta Prague', league: 'Czech First League', country: 'Czech Republic', rating: 7.3 },
@@ -447,18 +535,10 @@ class FootballSimulation {
             { name: 'Jablonec', league: 'Czech First League', country: 'Czech Republic', rating: 6.3 },
             { name: 'Sigma Olomouc', league: 'Czech First League', country: 'Czech Republic', rating: 6.1 },
             { name: 'Slovan Liberec', league: 'Czech First League', country: 'Czech Republic', rating: 5.9 },
-            { name: 'Hradec Kralove', league: 'Czech First League', country: 'Czech Republic', rating: 5.7 },
-            { name: 'Fastav Zlin', league: 'Czech First League', country: 'Czech Republic', rating: 5.5 },
-            { name: 'Bohemians', league: 'Czech First League', country: 'Czech Republic', rating: 5.3 },
-            { name: 'Ceske Budejovice', league: 'Czech First League', country: 'Czech Republic', rating: 5.1 },
-            { name: 'Karvina', league: 'Czech First League', country: 'Czech Republic', rating: 4.9 },
-            { name: 'Pardubice', league: 'Czech First League', country: 'Czech Republic', rating: 4.7 },
-            { name: 'Slovacko', league: 'Czech First League', country: 'Czech Republic', rating: 4.5 },
-            { name: 'Teplice', league: 'Czech First League', country: 'Czech Republic', rating: 4.3 },
-            { name: 'Dukla Prague', league: 'Czech First League', country: 'Czech Republic', rating: 4.1 }
+            { name: 'Hradec Kralove', league: 'Czech First League', country: 'Czech Republic', rating: 5.7 }
         ];
 
-        // Greek Super League Teams
+        // Greek Super League - 8 takım
         const greekTeams = [
             { name: 'Olympiacos', league: 'Super League Greece', country: 'Greece', rating: 7.4 },
             { name: 'Panathinaikos', league: 'Super League Greece', country: 'Greece', rating: 7.2 },
@@ -467,16 +547,10 @@ class FootballSimulation {
             { name: 'Aris', league: 'Super League Greece', country: 'Greece', rating: 6.3 },
             { name: 'Atromitos', league: 'Super League Greece', country: 'Greece', rating: 6.1 },
             { name: 'Volos', league: 'Super League Greece', country: 'Greece', rating: 5.9 },
-            { name: 'OFI', league: 'Super League Greece', country: 'Greece', rating: 5.7 },
-            { name: 'Asteras Tripolis', league: 'Super League Greece', country: 'Greece', rating: 5.5 },
-            { name: 'Lamia', league: 'Super League Greece', country: 'Greece', rating: 5.3 },
-            { name: 'Panserraikos', league: 'Super League Greece', country: 'Greece', rating: 5.1 },
-            { name: 'Levadiakos', league: 'Super League Greece', country: 'Greece', rating: 4.9 },
-            { name: 'Kifisia', league: 'Super League Greece', country: 'Greece', rating: 4.7 },
-            { name: 'Athens Kallithea', league: 'Super League Greece', country: 'Greece', rating: 4.5 }
+            { name: 'OFI', league: 'Super League Greece', country: 'Greece', rating: 5.7 }
         ];
 
-        // Additional leagues teams
+        // Austrian Bundesliga - 8 takım
         const austrianTeams = [
             { name: 'Red Bull Salzburg', league: 'Austrian Bundesliga', country: 'Austria', rating: 7.0 },
             { name: 'Sturm Graz', league: 'Austrian Bundesliga', country: 'Austria', rating: 6.5 },
@@ -485,11 +559,7 @@ class FootballSimulation {
             { name: 'Rapid Wien', league: 'Austrian Bundesliga', country: 'Austria', rating: 5.9 },
             { name: 'Wolfsberger AC', league: 'Austrian Bundesliga', country: 'Austria', rating: 5.7 },
             { name: 'TSV Hartberg', league: 'Austrian Bundesliga', country: 'Austria', rating: 5.5 },
-            { name: 'WSG Tirol', league: 'Austrian Bundesliga', country: 'Austria', rating: 5.3 },
-            { name: 'Altach', league: 'Austrian Bundesliga', country: 'Austria', rating: 5.1 },
-            { name: 'Austria Klagenfurt', league: 'Austrian Bundesliga', country: 'Austria', rating: 4.9 },
-            { name: 'Blau-Weiss Linz', league: 'Austrian Bundesliga', country: 'Austria', rating: 4.7 },
-            { name: 'Rheindorf Altach', league: 'Austrian Bundesliga', country: 'Austria', rating: 4.5 }
+            { name: 'WSG Tirol', league: 'Austrian Bundesliga', country: 'Austria', rating: 5.3 }
         ];
 
         const danishTeams = [
@@ -500,31 +570,129 @@ class FootballSimulation {
             { name: 'Silkeborg IF', league: 'Danish Superliga', country: 'Denmark', rating: 6.0 },
             { name: 'FC Nordsjaelland', league: 'Danish Superliga', country: 'Denmark', rating: 5.8 },
             { name: 'Randers FC', league: 'Danish Superliga', country: 'Denmark', rating: 5.6 },
-            { name: 'Viborg FF', league: 'Danish Superliga', country: 'Denmark', rating: 5.4 },
-            { name: 'OB Odense', league: 'Danish Superliga', country: 'Denmark', rating: 5.2 },
-            { name: 'Aalborg BK', league: 'Danish Superliga', country: 'Denmark', rating: 5.0 },
-            { name: 'Lyngby BK', league: 'Danish Superliga', country: 'Denmark', rating: 4.8 },
-            { name: 'Vejle BK', league: 'Danish Superliga', country: 'Denmark', rating: 4.6 }
+            { name: 'Viborg FF', league: 'Danish Superliga', country: 'Denmark', rating: 5.4 }
+        ];
+        const ukraineTeams = [
+            { name: 'Shakhtar Donetsk', league: 'Ukrainian Premier League', country: 'Ukraine', rating: 7.2 },
+            { name: 'Dynamo Kyiv', league: 'Ukrainian Premier League', country: 'Ukraine', rating: 7.0 },
+            { name: 'Dnipro-1', league: 'Ukrainian Premier League', country: 'Ukraine', rating: 6.4 },
+            { name: 'Zorya', league: 'Ukrainian Premier League', country: 'Ukraine', rating: 6.0 },
+            { name: 'Vorskla', league: 'Ukrainian Premier League', country: 'Ukraine', rating: 5.6 },
+            { name: 'Oleksandriya', league: 'Ukrainian Premier League', country: 'Ukraine', rating: 5.2 },
+            { name: 'Kolos Kovalivka', league: 'Ukrainian Premier League', country: 'Ukraine', rating: 4.8 },
+            { name: 'Rukh Lviv', league: 'Ukrainian Premier League', country: 'Ukraine', rating: 4.4 }
+        ];
+        const swissTeams = [
+            { name: 'Young Boys', league: 'Swiss Super League', country: 'Switzerland', rating: 7.0 },
+            { name: 'FC Basel', league: 'Swiss Super League', country: 'Switzerland', rating: 6.8 },
+            { name: 'FC Zurich', league: 'Swiss Super League', country: 'Switzerland', rating: 6.4 },
+            { name: 'Lugano', league: 'Swiss Super League', country: 'Switzerland', rating: 6.0 },
+            { name: 'St. Gallen', league: 'Swiss Super League', country: 'Switzerland', rating: 5.6 },
+            { name: 'Lucerne', league: 'Swiss Super League', country: 'Switzerland', rating: 5.2 },
+            { name: 'Servette', league: 'Swiss Super League', country: 'Switzerland', rating: 4.8 },
+            { name: 'Grasshopper', league: 'Swiss Super League', country: 'Switzerland', rating: 4.4 }
+        ];
+        const swedenTeams = [
+            { name: 'Malmo FF', league: 'Allsvenskan', country: 'Sweden', rating: 6.8 },
+            { name: 'AIK', league: 'Allsvenskan', country: 'Sweden', rating: 6.4 },
+            { name: 'Hacken', league: 'Allsvenskan', country: 'Sweden', rating: 6.0 },
+            { name: 'Djurgarden', league: 'Allsvenskan', country: 'Sweden', rating: 5.6 },
+            { name: 'IFK Goteborg', league: 'Allsvenskan', country: 'Sweden', rating: 5.2 },
+            { name: 'Elfsborg', league: 'Allsvenskan', country: 'Sweden', rating: 4.8 },
+            { name: 'Norrkoping', league: 'Allsvenskan', country: 'Sweden', rating: 4.4 },
+            { name: 'Hammarby', league: 'Allsvenskan', country: 'Sweden', rating: 4.0 }
+        ];
+        const cyprusTeams = [
+            { name: 'APOEL', league: 'Cypriot First Division', country: 'Cyprus', rating: 6.4 },
+            { name: 'Omonia', league: 'Cypriot First Division', country: 'Cyprus', rating: 6.0 },
+            { name: 'AEK Larnaca', league: 'Cypriot First Division', country: 'Cyprus', rating: 5.6 },
+            { name: 'Apollon', league: 'Cypriot First Division', country: 'Cyprus', rating: 5.2 },
+            { name: 'Paphos FC', league: 'Cypriot First Division', country: 'Cyprus', rating: 4.8 },
+            { name: 'Aris Limassol', league: 'Cypriot First Division', country: 'Cyprus', rating: 4.4 },
+            { name: 'Anorthosis', league: 'Cypriot First Division', country: 'Cyprus', rating: 4.0 },
+            { name: 'Ethnikos Achna', league: 'Cypriot First Division', country: 'Cyprus', rating: 3.6 }
+        ];
+        const polandTeams = [
+            { name: 'Legia Warsaw', league: 'Ekstraklasa', country: 'Poland', rating: 6.6 },
+            { name: 'Lech Poznan', league: 'Ekstraklasa', country: 'Poland', rating: 6.2 },
+            { name: 'Pogon Szczecin', league: 'Ekstraklasa', country: 'Poland', rating: 5.8 },
+            { name: 'Rakow Czestochowa', league: 'Ekstraklasa', country: 'Poland', rating: 5.4 },
+            { name: 'Wisła Krakow', league: 'Ekstraklasa', country: 'Poland', rating: 5.0 },
+            { name: 'Gornik Zabrze', league: 'Ekstraklasa', country: 'Poland', rating: 4.6 },
+            { name: 'Slask Wroclaw', league: 'Ekstraklasa', country: 'Poland', rating: 4.2 },
+            { name: 'Jagiellonia', league: 'Ekstraklasa', country: 'Poland', rating: 3.8 }
+        ];
+        const norwayTeams = [
+            { name: 'Bodo/Glimt', league: 'Eliteserien', country: 'Norway', rating: 6.6 },
+            { name: 'Molde', league: 'Eliteserien', country: 'Norway', rating: 6.2 },
+            { name: 'Rosenborg', league: 'Eliteserien', country: 'Norway', rating: 5.8 },
+            { name: 'Viking', league: 'Eliteserien', country: 'Norway', rating: 5.4 },
+            { name: 'Brann', league: 'Eliteserien', country: 'Norway', rating: 5.0 },
+            { name: 'Lillestrom', league: 'Eliteserien', country: 'Norway', rating: 4.6 },
+            { name: 'Tromso', league: 'Eliteserien', country: 'Norway', rating: 4.2 },
+            { name: 'Odd', league: 'Eliteserien', country: 'Norway', rating: 3.8 }
+        ];
+        const hungaryTeams = [
+            { name: 'Ferencvaros', league: 'NB I', country: 'Hungary', rating: 6.4 },
+            { name: 'Puskas Akademia', league: 'NB I', country: 'Hungary', rating: 6.0 },
+            { name: 'Videoton', league: 'NB I', country: 'Hungary', rating: 5.6 },
+            { name: 'Debrecen', league: 'NB I', country: 'Hungary', rating: 5.2 },
+            { name: 'Kisvarda', league: 'NB I', country: 'Hungary', rating: 4.8 },
+            { name: 'Paks', league: 'NB I', country: 'Hungary', rating: 4.4 },
+            { name: 'Honved', league: 'NB I', country: 'Hungary', rating: 4.0 },
+            { name: 'Ujpest', league: 'NB I', country: 'Hungary', rating: 3.6 }
+        ];
+        const croatiaTeams = [
+            { name: 'Dinamo Zagreb', league: 'HNL', country: 'Croatia', rating: 6.6 },
+            { name: 'Hajduk Split', league: 'HNL', country: 'Croatia', rating: 6.2 },
+            { name: 'Rijeka', league: 'HNL', country: 'Croatia', rating: 5.8 },
+            { name: 'Osijek', league: 'HNL', country: 'Croatia', rating: 5.4 },
+            { name: 'Gorica', league: 'HNL', country: 'Croatia', rating: 5.0 },
+            { name: 'Lokomotiva', league: 'HNL', country: 'Croatia', rating: 4.6 },
+            { name: 'Slaven Belupo', league: 'HNL', country: 'Croatia', rating: 4.2 },
+            { name: 'Istra 1961', league: 'HNL', country: 'Croatia', rating: 3.8 }
+        ];
+        const romaniaTeams = [
+            { name: 'FCSB', league: 'Liga 1', country: 'Romania', rating: 6.4 },
+            { name: 'CFR Cluj', league: 'Liga 1', country: 'Romania', rating: 6.0 },
+            { name: 'Universitatea Craiova', league: 'Liga 1', country: 'Romania', rating: 5.6 },
+            { name: 'Rapid Bucharest', league: 'Liga 1', country: 'Romania', rating: 5.2 },
+            { name: 'Dinamo Bucharest', league: 'Liga 1', country: 'Romania', rating: 4.8 },
+            { name: 'Petrolul', league: 'Liga 1', country: 'Romania', rating: 4.4 },
+            { name: 'Sepsi', league: 'Liga 1', country: 'Romania', rating: 4.0 },
+            { name: 'UTA Arad', league: 'Liga 1', country: 'Romania', rating: 3.6 }
+        ];
+        const serbiaTeams = [
+            { name: 'Red Star Belgrade', league: 'SuperLiga', country: 'Serbia', rating: 6.4 },
+            { name: 'Partizan Belgrade', league: 'SuperLiga', country: 'Serbia', rating: 6.0 },
+            { name: 'Vojvodina', league: 'SuperLiga', country: 'Serbia', rating: 5.6 },
+            { name: 'Cukaricki', league: 'SuperLiga', country: 'Serbia', rating: 5.2 },
+            { name: 'TSC Backa Topola', league: 'SuperLiga', country: 'Serbia', rating: 4.8 },
+            { name: 'Radnicki Nis', league: 'SuperLiga', country: 'Serbia', rating: 4.4 },
+            { name: 'Spartak Subotica', league: 'SuperLiga', country: 'Serbia', rating: 4.0 },
+            { name: 'Mladost', league: 'SuperLiga', country: 'Serbia', rating: 3.6 }
         ];
 
-        // Combine all teams
         this.teams = [
             ...defaultTeams, ...portugalTeams, ...eredivisieTeams, ...superLigTeams, 
             ...belgiumTeams, ...scottishTeams, ...czechTeams, ...greekTeams,
-            ...austrianTeams, ...danishTeams
-        ];
+            ...austrianTeams, ...danishTeams, ...ukraineTeams, ...swissTeams, ...swedenTeams,
+            ...cyprusTeams, ...polandTeams, ...norwayTeams, ...hungaryTeams, ...croatiaTeams,
+            ...romaniaTeams, ...serbiaTeams
+        ].map((t, i) => ({ ...t, id: t.id || Date.now() + i, rating: this.normalizeRating(t.rating) }));
         this.saveData();
         this.updateStats();
         this.renderTeams();
     }
 
     addTeam() {
-        const name = document.getElementById('team-name').value;
+        const name = document.getElementById('team-name').value.trim();
         const league = document.getElementById('team-league').value;
-        const rating = parseFloat(document.getElementById('team-rating').value);
-        const country = document.getElementById('team-country').value;
+        const ratingRaw = document.getElementById('team-rating').value;
+        const rating = this.normalizeRating(ratingRaw);
+        const country = this.leagueToCountry[league] || this.leagues[league]?.country || '';
 
-        if (name && league && rating && country && rating >= 0.5 && rating <= 9.9) {
+        if (name && league && country && rating >= 0.5 && rating <= 9.9) {
             const newTeam = {
                 id: Date.now(),
                 name,
@@ -555,10 +723,10 @@ class FootballSimulation {
         // Clear form first
         document.getElementById('edit-team-form').reset();
         
-        // Populate form with current team's values
+        // Populate form with current team's values (reyting her zaman 0.5-9.9 göster)
         document.getElementById('edit-team-name').value = team.name;
         document.getElementById('edit-team-league').value = team.league;
-        document.getElementById('edit-team-rating').value = team.rating;
+        document.getElementById('edit-team-rating').value = this.normalizeRating(team.rating);
         
         // Store the team ID for saving
         this.editingTeamId = teamId;
@@ -572,11 +740,15 @@ class FootballSimulation {
     saveEditedTeam() {
         const name = document.getElementById('edit-team-name').value.trim();
         const league = document.getElementById('edit-team-league').value;
-        const rating = parseFloat(document.getElementById('edit-team-rating').value);
+        const ratingInput = document.getElementById('edit-team-rating').value;
+        const rating = this.normalizeRating(ratingInput);
 
-        // Validate inputs
-        if (!name || !league || isNaN(rating) || rating < 0.5 || rating > 9.9 || !this.editingTeamId) {
-            alert('Lütfen tüm alanları doğru şekilde doldurun. Reyting 0.5-9.9 arasında olmalıdır.');
+        if (!name || !league || !this.editingTeamId) {
+            alert('Lütfen takım adı ve lig seçin.');
+            return;
+        }
+        if (rating < 0.5 || rating > 9.9) {
+            alert('Reyting 0.5 ile 9.9 arasında olmalıdır (virgül veya nokta kullanabilirsiniz).');
             return;
         }
 
@@ -589,7 +761,8 @@ class FootballSimulation {
                 ...this.teams[teamIndex],
                 name,
                 league,
-                rating: Number(rating.toFixed(1)) // Ensure proper number format
+                country: this.leagueToCountry[league] || this.leagues[league]?.country || this.teams[teamIndex].country,
+                rating: Math.round(rating * 10) / 10
             };
             
             // Force save and update
@@ -760,12 +933,11 @@ class FootballSimulation {
         return simulatedMatches;
     }
 
-    // Match Simulation Engine (Balanced for realistic results)
+    // Match Simulation Engine (0.5-9.9 reyting)
     simulateMatch(homeTeam, awayTeam, isEuropean = false) {
-        // More subtle home advantage
         const homeAdvantageBoost = (this.settings.homeAdvantage / 100) * 0.15;
-        const homeRating = homeTeam.rating + (isEuropean ? homeAdvantageBoost * 0.8 : homeAdvantageBoost);
-        const awayRating = awayTeam.rating;
+        const homeRating = this.normalizeRating(homeTeam.rating) + (isEuropean ? homeAdvantageBoost * 0.8 : homeAdvantageBoost);
+        const awayRating = this.normalizeRating(awayTeam.rating);
         
         // More balanced probability calculation
         const ratingDiff = homeRating - awayRating;
@@ -828,9 +1000,8 @@ class FootballSimulation {
     }
 
     generateGoals(attackRating, defenseRating, isWinner) {
-        // More realistic goal calculation for 0.5-9.9 rating system
-        const attackStrength = Math.max(0.5, attackRating);
-        const defenseStrength = Math.max(0.5, defenseRating);
+        const attackStrength = Math.max(0.5, Math.min(9.9, attackRating));
+        const defenseStrength = Math.max(0.5, Math.min(9.9, defenseRating));
         
         // Balanced expectancy - typically 0.5 to 2.5 goals
         const ratingRatio = attackStrength / defenseStrength;
@@ -933,8 +1104,16 @@ class FootballSimulation {
         this.addActivity(`${weekMatches.length} haftalık maç simüle edildi`);
     }
 
-    getLeagueMatches(leagueName) {
-        return this.matches.filter(m => m.league === leagueName && m.season === this.currentSeason);
+    getLeagueMatches(leagueName, season) {
+        const s = season !== undefined ? season : this.currentSeason;
+        return this.matches.filter(m => m.league === leagueName && m.season === s);
+    }
+
+    getAvailableSeasons() {
+        const set = new Set();
+        this.matches.forEach(m => set.add(m.season));
+        const arr = Array.from(set).sort().reverse();
+        return arr.length ? arr : [this.currentSeason];
     }
 
     // European Competition Management
@@ -953,38 +1132,49 @@ class FootballSimulation {
         this.saveData();
     }
 
-    calculateCountryCoefficients() {
+    getEuropeanStagePoints(competition, stage) {
+        const comp = (competition || '').toUpperCase().replace('UECL', 'UECL');
+        const map = this.europeanPoints[comp];
+        if (!map) return 0;
+        return map[stage] ?? map[stage.replace(/ /g, '_')] ?? 0;
+    }
+
+    calculateCountryCoefficients(season) {
+        const s = season !== undefined ? season : this.currentSeason;
         const seasonPoints = {};
         
         this.europeanResults
-            .filter(result => result.season === this.currentSeason)
+            .filter(result => result.season === s)
             .forEach(result => {
                 const team = this.teams.find(t => t.name === result.team);
                 if (team) {
+                    const pts = this.getEuropeanStagePoints(result.competition, result.stage);
                     if (!seasonPoints[team.country]) {
                         seasonPoints[team.country] = { points: 0, teams: new Set() };
                     }
-                    seasonPoints[team.country].points += this.europeanPoints[result.competition][result.stage];
+                    seasonPoints[team.country].points += pts;
                     seasonPoints[team.country].teams.add(result.team);
+                    if (result.points === undefined) result.points = pts;
                 }
             });
 
-        // Calculate coefficients (total points / participating teams)
         Object.keys(seasonPoints).forEach(country => {
-            const coefficient = seasonPoints[country].points / seasonPoints[country].teams.size;
+            const numTeams = seasonPoints[country].teams.size;
+            const totalPoints = seasonPoints[country].points;
+            const coefficient = numTeams > 0 ? totalPoints / numTeams : 0;
             
             let countryData = this.countryCoefficients.find(c => c.country === country);
             if (!countryData) {
                 countryData = { country, seasons: {} };
                 this.countryCoefficients.push(countryData);
             }
-            
-            countryData.seasons[this.currentSeason] = {
+            countryData.seasons[s] = {
                 coefficient,
-                points: seasonPoints[country].points,
-                teams: seasonPoints[country].teams.size
+                points: totalPoints,
+                teams: numTeams
             };
         });
+        this.saveData();
     }
 
     // Rendering Methods
@@ -998,6 +1188,8 @@ class FootballSimulation {
         document.getElementById('total-matches').textContent = this.matches.length;
         document.getElementById('current-season').textContent = this.currentSeason;
         document.getElementById('current-season-display').textContent = this.currentSeason;
+        const totalLeaguesEl = document.getElementById('total-leagues');
+        if (totalLeaguesEl) totalLeaguesEl.textContent = Object.keys(this.leagues).length;
     }
 
     renderRecentActivity() {
@@ -1072,31 +1264,33 @@ class FootballSimulation {
         `).join('');
     }
 
-    showLeagueTable(leagueName) {
-        // Update active tab
-        document.querySelectorAll('.league-tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        document.querySelector(`[data-league="${leagueName}"]`).classList.add('active');
+    showLeagueTable(leagueName, season) {
+        const viewSeason = season !== undefined ? season : this.currentSeason;
 
-        // Get league teams and matches
+        document.querySelectorAll('.league-tab').forEach(tab => tab.classList.remove('active'));
+        const tabEl = document.querySelector(`[data-league="${leagueName}"]`);
+        if (tabEl) tabEl.classList.add('active');
+
         const leagueTeams = this.teams.filter(team => team.league === leagueName);
-        const leagueMatches = this.getLeagueMatches(leagueName);
-
-        // Calculate standings
+        const leagueMatches = this.getLeagueMatches(leagueName, viewSeason);
         const standings = this.calculateStandings(leagueTeams, leagueMatches);
-        
-        // Get European qualification spots for this league
         const leagueRanking = this.getLeagueRanking(leagueName);
         const europeanSpots = this.getEuropeanSpots(leagueRanking);
+        const availableSeasons = this.getAvailableSeasons();
 
         const tableContainer = document.getElementById('league-table');
         tableContainer.innerHTML = `
-            <h3>${leagueName} - ${this.currentSeason}</h3>
-            <div class="section-controls">
+            <h3>${leagueName} - ${viewSeason}</h3>
+            <div class="section-controls league-table-controls">
+                <label>Sezon:</label>
+                <select id="league-season-select" onchange="onLeagueSeasonChange('${leagueName}')">
+                    ${availableSeasons.map(s => `<option value="${s}" ${s === viewSeason ? 'selected' : ''}>${s}</option>`).join('')}
+                </select>
+                ${viewSeason === this.currentSeason ? `
                 <button class="btn btn-warning" onclick="deleteLeagueSeason('${leagueName}')">
                     <i class="fas fa-trash"></i> Bu Ligin Sezonunu Sil
                 </button>
+                ` : ''}
             </div>
             <div class="table-responsive">
                 <table class="league-table">
@@ -1138,6 +1332,7 @@ class FootballSimulation {
                 </table>
                 <div class="legend">
                     <div class="legend-item champion">Şampiyon (UCL)</div>
+                    <div class="legend-item uel-champion">Şampiyon (UEL)</div>
                     <div class="legend-item ucl-qualification">Şampiyonlar Ligi</div>
                     <div class="legend-item uel-qualification">Avrupa Ligi</div>
                     <div class="legend-item uecl-qualification">Konferans Ligi</div>
@@ -1145,7 +1340,30 @@ class FootballSimulation {
                     <div class="legend-item relegation-zone">Küme Düşme</div>
                 </div>
             </div>
+            <div class="season-fixtures-section">
+                <h4>${viewSeason} Sezonu Maç Sonuçları</h4>
+                <div id="league-season-fixtures">${this.renderSeasonFixturesByWeek(leagueName, viewSeason, leagueMatches)}</div>
+            </div>
         `;
+    }
+
+    renderSeasonFixturesByWeek(leagueName, season, leagueMatches) {
+        const byWeek = {};
+        leagueMatches.forEach(m => {
+            const w = m.week || 1;
+            if (!byWeek[w]) byWeek[w] = [];
+            byWeek[w].push(m);
+        });
+        const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
+        if (weeks.length === 0) return '<p class="no-data">Bu sezona ait maç kaydı yok.</p>';
+        return weeks.map(week => `
+            <div class="week-results-block">
+                <strong>Hafta ${week}</strong>
+                <ul class="week-results-list">
+                    ${byWeek[week].map(m => `<li>${m.homeTeam} ${m.homeGoals} - ${m.awayGoals} ${m.awayTeam}</li>`).join('')}
+                </ul>
+            </div>
+        `).join('');
     }
 
     getPositionClass(position, leagueName, europeanSpots) {
@@ -1185,28 +1403,15 @@ class FootballSimulation {
     }
     
     getCountryRanking(country) {
-        // Get ranking based on coefficient (2027-28 season)
-        const leaguesByCoefficient = Object.entries(this.leagues)
-            .sort((a, b) => b[1].coefficient - a[1].coefficient);
-        
-        for (let i = 0; i < leaguesByCoefficient.length; i++) {
-            if (leaguesByCoefficient[i][1].country === country) {
-                return i + 1;
-            }
-        }
-        return 25; // Default for unknown countries
+        const idx = this.coefficientRanking.findIndex(r => r.country === country);
+        return idx >= 0 ? idx + 1 : 25;
     }
     
     getLeagueRanking(leagueName) {
-        const leaguesByCoefficient = Object.entries(this.leagues)
-            .sort((a, b) => b[1].coefficient - a[1].coefficient);
-        
-        for (let i = 0; i < leaguesByCoefficient.length; i++) {
-            if (leaguesByCoefficient[i][0] === leagueName) {
-                return i + 1;
-            }
-        }
-        return 25;
+        const country = this.leagueToCountry[leagueName] || this.leagues[leagueName]?.country;
+        if (!country) return 25;
+        const idx = this.coefficientRanking.findIndex(r => r.country === country);
+        return idx >= 0 ? idx + 1 : 25;
     }
     
     getEuropeanSpots(countryRanking) {
@@ -1319,77 +1524,425 @@ class FootballSimulation {
         `).join('');
     }
 
-    showEuropeanCompetition(competition) {
-        // Update active tab
-        document.querySelectorAll('.european-tab').forEach(tab => {
-            tab.classList.remove('active');
+    getEuropeanParticipants2028_29() {
+        const participants = { UCL: [], UEL: [], UECL: [] };
+        Object.keys(this.leagues).forEach(leagueName => {
+            const rank = this.getLeagueRanking(leagueName);
+            const spots = this.getEuropeanSpots(rank);
+            const leagueTeams = this.teams.filter(t => t.league === leagueName);
+            const matches = this.getLeagueMatches(leagueName);
+            const standings = this.calculateStandings(leagueTeams, matches);
+            let sorted = standings.sort((a, b) => b.points - a.points || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst));
+            if (matches.length === 0) sorted = standings.sort((a, b) => (this.teams.find(t => t.name === b.name)?.rating || 0) - (this.teams.find(t => t.name === a.name)?.rating || 0));
+            let idx = 0;
+            for (let i = 0; i < (spots.ucl || 0) && idx < sorted.length; i++) participants.UCL.push({ team: sorted[idx++].name, league: leagueName });
+            for (let i = 0; i < (spots.uel || 0) && idx < sorted.length; i++) participants.UEL.push({ team: sorted[idx++].name, league: leagueName });
+            for (let i = 0; i < (spots.uecl || 0) && idx < sorted.length; i++) participants.UECL.push({ team: sorted[idx++].name, league: leagueName });
         });
-        document.querySelector(`[data-competition="${competition}"]`).classList.add('active');
+        return participants;
+    }
+
+    showEuropeanCompetition(competition) {
+        document.querySelectorAll('.european-tab').forEach(tab => tab.classList.remove('active'));
+        document.querySelector(`[data-competition="${competition}"]`)?.classList.add('active');
 
         const content = document.getElementById('european-content');
-        const comp = competition.toUpperCase();
-        
-        content.innerHTML = `
+        const compKey = competition.toUpperCase();
+        const comp = competition.toLowerCase();
+        let part = this.europeanSeason2028_29[compKey];
+        if (!part || part.length === 0) part = this.getEuropeanParticipants2028_29()[compKey];
+        const state = this.getEuropeanPlayableState(compKey);
+        const partList = (part || []).slice(0, 36);
+        const has36 = partList.length >= 36;
+
+        let html = `
             <div class="european-competition-content">
-                <h3>${this.europeanCompetitions[comp].name}</h3>
+                <h3>${this.europeanCompetitions[compKey].name} 2028-29</h3>
                 <div class="qualification-info">
-                    <h4>Katılım Durumu</h4>
-                    <p>Bu özellik yakında eklenecek...</p>
+                    <h4>Katılımcılar</h4>
+                    <button class="btn btn-primary mb-2" onclick="window.footballSim.setEuropeanParticipants2028_29(); window.footballSim.showEuropeanCompetition('${comp}');">
+                        <i class="fas fa-sync"></i> Katılımcıları Güncelle
+                    </button>
+                    <ul class="european-participants-list">${(part || []).map(p => `<li>${typeof p === 'string' ? p : (p.team || p)} ${(p.league && typeof p === 'object') ? `(${p.league})` : ''}</li>`).join('')}</ul>
+                    ${(!part || part.length === 0) ? '<p class="no-data">Önce Katılımcıları Güncelle ile lig sıralamasına göre atanır.</p>' : ''}
                 </div>
-                <div class="european-points">
+        `;
+
+        if (state.phase === 'none') {
+            if (has36) html += `<button class="btn btn-success mb-3" onclick="window.footballSim.startEuropeanGroupStage('${comp}');"><i class="fas fa-play"></i> Grup Aşaması Başlat</button>`;
+        }
+
+        if (state.phase === 'group') {
+            const standings = this.getEuropeanGroupStandings(compKey);
+            const totalPlayed = state.groupMatches.filter(m => m.homeGoals != null).length;
+            const allPlayed = totalPlayed >= state.groupMatches.length;
+            html += `<h4>Grup Puan Durumu (1-36)</h4><div class="european-standings-wrap"><table class="european-table"><thead><tr><th>#</th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>A</th><th>P</th></tr></thead><tbody>`;
+            standings.forEach((s, i) => {
+                const pos = i + 1;
+                const direct = pos <= 8 ? ' (Son 16)' : pos <= 24 ? ' (Playoff)' : '';
+                html += `<tr><td>${pos}</td><td>${s.name}${direct}</td><td>${s.played}</td><td>${s.won}</td><td>${s.drawn}</td><td>${s.lost}</td><td>${s.goalsFor}-${s.goalsAgainst}</td><td>${s.points}</td></tr>`;
+            });
+            html += `</tbody></table></div>`;
+            for (let md = 1; md <= 8; md++) {
+                const matches = state.groupMatches.filter(m => m.matchday === md);
+                const played = matches.filter(m => m.homeGoals != null).length;
+                html += `<div class="european-matchday-block"><h5>${md}. Maç Günü</h5>`;
+                if (played < matches.length) html += `<button class="btn btn-sm btn-primary mb-2" onclick="window.footballSim.simulateEuropeanMatchday('${comp}', ${md});">Maç gününü simüle et</button>`;
+                html += `<ul class="european-fixtures-list">`;
+                matches.forEach(m => {
+                    const score = m.homeGoals != null ? ` ${m.homeGoals}-${m.awayGoals} ` : '';
+                    const btn = m.homeGoals == null ? `<button class="btn btn-xs" onclick="window.footballSim.simulateEuropeanGroupMatch('${comp}', '${m.homeTeam.replace(/'/g, "\\'")}', '${m.awayTeam.replace(/'/g, "\\'")}', ${md});">Simüle et</button>` : '';
+                    html += `<li>${m.homeTeam} - ${m.awayTeam} ${score} ${btn}</li>`;
+                });
+                html += `</ul></div>`;
+            }
+            if (allPlayed) html += `<button class="btn btn-success mt-2" onclick="window.footballSim.openPlayoffDraw('${comp}');"><i class="fas fa-random"></i> Playoff Kura Çekimi</button>`;
+        }
+
+        if (state.phase === 'playoff_draw') {
+            const st = state.standingsOrder || [];
+            const groups = [
+                st.slice(8, 10), st.slice(10, 12), st.slice(12, 14), st.slice(14, 16),
+                st.slice(16, 18), st.slice(18, 20), st.slice(20, 22), st.slice(22, 24)
+            ];
+            const pairOpp = [7, 6, 5, 4, 3, 2, 1, 0];
+            const drawn = new Set(state.playoffPairs.flatMap(p => [p.team1, p.team2]));
+            html += `<h4>Playoff Kura Çekimi</h4><p>Her eşleşmede soldan bir takım, sağdan bir takım seçin (aynı ülke olamaz).</p>`;
+            if (state._playoffTemp && state._playoffTemp[comp]) html += `<p class="draw-hint">Seçilen: <strong>${state._playoffTemp[comp].teamA}</strong> — Rakibi seçin.</p>`;
+            for (let slot = 0; slot < 4; slot++) {
+                const high = groups[slot] || [], low = groups[pairOpp[slot]] || [];
+                const highLeft = high.filter(t => !drawn.has(t));
+                const lowLeft = low.filter(t => !drawn.has(t));
+                html += `<div class="playoff-draw-slot"><strong>Eşleşme ${slot + 1}:</strong> Sıra ${9 + slot * 2}-${10 + slot * 2} vs Sıra ${24 - slot * 2 - 1}-${24 - slot * 2}`;
+                html += ` <span class="bowl">${highLeft.map(t => `<button type="button" class="btn btn-sm draw-btn" onclick="window.footballSim._playoffPick('${comp}', ${slot}, '${t.replace(/'/g, "\\'")}', null)">${t}</button>`).join(' ')}</span> vs <span class="bowl">${lowLeft.map(t => `<button type="button" class="btn btn-sm draw-btn" onclick="window.footballSim._playoffPick('${comp}', ${slot}, null, '${t.replace(/'/g, "\\'")}')">${t}</button>`).join(' ')}</span></div>`;
+            }
+            html += `<p class="mt-2"><strong>Yapılan eşleşmeler:</strong> ${state.playoffPairs.map(p => `${p.team1} - ${p.team2}`).join(' | ') || '-'}</p>`;
+            if (state.playoffPairs.length >= 8) html += `<button class="btn btn-success mt-2" onclick="window.footballSim.finishPlayoffDraw('${comp}');">Kura Çekimini Bitir</button>`;
+        }
+
+        if (state.phase === 'playoff') {
+            html += `<h4>Playoff (İki maçlı)</h4>`;
+            (state.playoffResults || []).forEach((pair, i) => {
+                const l1 = pair.leg1Home != null ? `${pair.leg1Home}-${pair.leg1Away}` : '-';
+                const l2 = pair.leg2Home != null ? `${pair.leg2Home}-${pair.leg2Away}` : '-';
+                const leg1Btn = pair.leg1Home == null ? `<button class="btn btn-sm" onclick="window.footballSim.simulatePlayoffLeg('${comp}', ${i}, 1);">1. maç simüle</button>` : '';
+                const leg2Btn = pair.leg2Home == null ? `<button class="btn btn-sm" onclick="window.footballSim.simulatePlayoffLeg('${comp}', ${i}, 2);">2. maç simüle</button>` : '';
+                html += `<div class="playoff-tie">${pair.team1} vs ${pair.team2} — 1. maç: ${l1} ${leg1Btn} | 2. maç: ${l2} ${leg2Btn}</div>`;
+            });
+            const allPlayoffDone = (state.playoffResults || []).every(p => p.leg1Home != null && p.leg2Home != null);
+            if (allPlayoffDone) html += `<button class="btn btn-success mt-2" onclick="window.footballSim.openR16Draw('${comp}');"><i class="fas fa-random"></i> Son 16 Kura Çekimi</button>`;
+        }
+
+        if (state.phase === 'r16_draw') {
+            const seeded = state.r16Seeded || [];
+            const unseeded = state.r16Unseeded || [];
+            const usedS = new Set(state.r16Pairs.flatMap(p => [p.team1]));
+            const usedU = new Set(state.r16Pairs.flatMap(p => [p.team2]));
+            html += `<h4>Son 16 Kura Çekimi</h4><p>Seri başı (1-8) ve playoff kazananlarından birer takım seçin (aynı ülke olamaz).</p>`;
+            if (state._r16Temp && state._r16Temp[comp]) html += `<p class="draw-hint">Seri başı seçildi — Playoff kazananı seçin (veya tersi).</p>`;
+            html += `<div class="r16-draw-wrap"><div class="bowl"><strong>Seri başı:</strong> ${seeded.map((t, i) => t && !usedS.has(t) ? `<button class="btn btn-sm draw-btn" onclick="window.footballSim._r16Pick('${comp}', 's', ${i})">${t}</button>` : t || '').filter(Boolean).join(' ')}</div>`;
+            html += `<div class="bowl"><strong>Playoff kazananları:</strong> ${unseeded.map((t, i) => t && !usedU.has(t) ? `<button class="btn btn-sm draw-btn" onclick="window.footballSim._r16Pick('${comp}', 'u', ${i})">${t}</button>` : t || '').filter(Boolean).join(' ')}</div></div>`;
+            html += `<p class="mt-2"><strong>Eşleşmeler:</strong> ${(state.r16Pairs || []).map(p => `${p.team1} - ${p.team2}`).join(' | ') || '-'}</p>`;
+            if ((state.r16Pairs || []).length >= 8) html += `<button class="btn btn-success mt-2" onclick="window.footballSim.finishR16Draw('${comp}');">Kura Çekimini Bitir</button>`;
+        }
+
+        if (state.phase === 'r16') {
+            html += `<h4>Son 16</h4><p>Kura tamamlandı. Maç simülasyonu bu aşamada eklenebilir.</p>`;
+        }
+
+        html += `
+                <div class="european-points mt-4">
                     <h4>Puan Sistemi</h4>
                     <table class="european-table">
-                        <thead>
-                            <tr>
-                                <th>Aşama</th>
-                                <th>Puan</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${Object.entries(this.europeanPoints[comp]).map(([stage, points]) => `
-                                <tr>
-                                    <td>${stage}</td>
-                                    <td>${points}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
+                        <thead><tr><th>Aşama</th><th>Puan</th></tr></thead>
+                        <tbody>${Object.entries(this.europeanPoints[compKey]).map(([stage, points]) => `<tr><td>${this.europeanStageLabels[stage] || stage}</td><td>${points}</td></tr>`).join('')}</tbody>
                     </table>
                 </div>
-            </div>
-        `;
+            </div>`;
+        content.innerHTML = html;
+    }
+
+    _playoffPick(comp, slotIndex, teamA, teamB) {
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
+        if (!state._playoffTemp) state._playoffTemp = {};
+        if (teamA != null) {
+            state._playoffTemp[comp] = { slot: slotIndex, teamA };
+            this.showEuropeanCompetition(comp);
+            return;
+        }
+        if (teamB != null && state._playoffTemp[comp] && state._playoffTemp[comp].slot === slotIndex && state._playoffTemp[comp].teamA) {
+            this.drawPlayoffPair(comp, slotIndex, state._playoffTemp[comp].teamA, teamB);
+            state._playoffTemp[comp] = null;
+        }
+        this.showEuropeanCompetition(comp);
+    }
+
+    _r16Pick(comp, which, index) {
+        const state = this.getEuropeanPlayableState(comp.toUpperCase());
+        if (!state._r16Temp) state._r16Temp = {};
+        if (which === 's') state._r16Temp[comp] = { seeded: index, unseeded: state._r16Temp[comp]?.unseeded };
+        if (which === 'u') state._r16Temp[comp] = { seeded: state._r16Temp[comp]?.seeded, unseeded: index };
+        const t = state._r16Temp[comp];
+        if (t && t.seeded != null && t.unseeded != null) {
+            this.drawR16Pair(comp, t.seeded, t.unseeded);
+            state._r16Temp[comp] = null;
+        }
+        this.showEuropeanCompetition(comp);
+    }
+
+    setEuropeanParticipants2028_29() {
+        this.europeanSeason2028_29 = this.getEuropeanParticipants2028_29();
+        this.saveData();
+        this.addActivity('2028-29 Avrupa katılımcıları güncellendi');
+    }
+
+    getEuropeanPlayableState(comp) {
+        const c = comp.toUpperCase();
+        if (!this.europeanPlayable[c]) this.europeanPlayable[c] = { phase: 'none', participants: [], pots: { 1: [], 2: [], 3: [], 4: [] }, groupMatches: [], playoffPairs: [], playoffResults: [], r16Pairs: [], knockoutResults: {} };
+        return this.europeanPlayable[c];
+    }
+
+    startEuropeanGroupStage(comp) {
+        const c = comp.toUpperCase();
+        let part = this.europeanSeason2028_29[c];
+        if (!part || part.length < 36) part = this.getEuropeanParticipants2028_29()[c];
+        if (!part || part.length < 36) {
+            alert('Bu kupada 36 takım olmalı. Önce "Katılımcıları Güncelle" ile lig sıralamasına göre takımları doldurun.');
+            return;
+        }
+        const state = this.getEuropeanPlayableState(comp);
+        const list = part.slice(0, 36).map(p => ({ name: typeof p === 'string' ? p : (p.team || p), league: typeof p === 'object' ? p.league : '' }));
+        const withRating = list.map(p => ({ ...p, country: (this.teams.find(t => t.name === p.name)?.country) || this.leagueToCountry[p.league] || '', rating: this.normalizeRating(this.teams.find(t => t.name === p.name)?.rating) || 7 }));
+        withRating.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        state.participants = withRating;
+        state.pots = { 1: [], 2: [], 3: [], 4: [] };
+        withRating.forEach((t, i) => {
+            const pot = Math.floor(i / 9) + 1;
+            state.pots[pot].push(t.name);
+        });
+        state.groupMatches = this.buildEuropeanGroupFixtures(state);
+        state.phase = 'group';
+        state.playoffPairs = [];
+        state.playoffResults = [];
+        state.r16Pairs = [];
+        state.knockoutResults = {};
+        this.saveData();
+        this.addActivity(`${this.europeanCompetitions[c].name} grup aşaması başlatıldı (8 maç günü)`);
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    buildEuropeanGroupFixtures(state) {
+        const getCountry = (name) => { const t = this.teams.find(x => x.name === name); return t ? (t.country || this.leagueToCountry[t.league] || '') : ''; };
+        const byPot = {
+            1: state.pots[1].map(n => ({ name: n, country: getCountry(n) })),
+            2: state.pots[2].map(n => ({ name: n, country: getCountry(n) })),
+            3: state.pots[3].map(n => ({ name: n, country: getCountry(n) })),
+            4: state.pots[4].map(n => ({ name: n, country: getCountry(n) }))
+        };
+        const matches = [];
+        let matchday = 1;
+        const pairPots = (p1, p2) => {
+            const A = [...byPot[p1]];
+            const B = [...byPot[p2]];
+            const used = new Set();
+            const paired = [];
+            A.forEach(a => {
+                const opp = B.find(b => !used.has(b.name) && b.country !== a.country);
+                if (opp) { used.add(opp.name); paired.push([a, opp]); }
+            });
+            paired.forEach(([a, b]) => matches.push({ homeTeam: a.name, awayTeam: b.name, matchday, homeGoals: null, awayGoals: null }));
+        };
+        [[1, 2], [3, 4], [1, 3], [2, 4], [1, 4], [2, 3]].forEach(([a, b]) => { pairPots(a, b); matchday++; });
+        [[1, 2], [3, 4], [1, 3], [2, 4], [1, 4], [2, 3]].forEach(([a, b]) => { pairPots(a, b); matchday++; });
+        const withinPotCycle = (arr) => {
+            if (arr.length < 2) return;
+            const order = [];
+            const used = new Set();
+            order.push(arr[0]); used.add(arr[0].name);
+            for (let k = 1; k < arr.length; k++) {
+                const last = order[order.length - 1];
+                const next = arr.find(t => !used.has(t.name) && t.country !== last.country) || arr.find(t => !used.has(t.name));
+                if (!next) break;
+                order.push(next); used.add(next.name);
+            }
+            for (let i = 0; i < order.length; i++) {
+                const a = order[i], b = order[(i + 1) % order.length];
+                matches.push({ homeTeam: a.name, awayTeam: b.name, matchday, homeGoals: null, awayGoals: null });
+            }
+        };
+        withinPotCycle(byPot[1]); withinPotCycle(byPot[2]); matchday++;
+        withinPotCycle(byPot[3]); withinPotCycle(byPot[4]);
+        return matches;
+    }
+
+    getEuropeanGroupStandings(comp) {
+        const state = this.getEuropeanPlayableState(comp);
+        const standings = {};
+        state.participants.forEach(p => { standings[p.name] = { name: p.name, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 0 }; });
+        state.groupMatches.filter(m => m.homeGoals != null).forEach(m => {
+            if (!standings[m.homeTeam] || !standings[m.awayTeam]) return;
+            standings[m.homeTeam].played++; standings[m.awayTeam].played++;
+            standings[m.homeTeam].goalsFor += m.homeGoals; standings[m.homeTeam].goalsAgainst += m.awayGoals;
+            standings[m.awayTeam].goalsFor += m.awayGoals; standings[m.awayTeam].goalsAgainst += m.homeGoals;
+            if (m.homeGoals > m.awayGoals) { standings[m.homeTeam].won++; standings[m.homeTeam].points += 3; standings[m.awayTeam].lost++; }
+            else if (m.homeGoals < m.awayGoals) { standings[m.awayTeam].won++; standings[m.awayTeam].points += 3; standings[m.homeTeam].lost++; }
+            else { standings[m.homeTeam].drawn++; standings[m.awayTeam].drawn++; standings[m.homeTeam].points++; standings[m.awayTeam].points++; }
+        });
+        return Object.values(standings).sort((a, b) => b.points - a.points || (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst) || b.goalsFor - a.goalsFor);
+    }
+
+    simulateEuropeanGroupMatch(comp, homeTeam, awayTeam, matchday) {
+        const state = this.getEuropeanPlayableState(comp);
+        const m = state.groupMatches.find(x => x.homeTeam === homeTeam && x.awayTeam === awayTeam && (matchday == null || x.matchday === matchday));
+        if (!m || m.homeGoals != null) return;
+        const home = this.teams.find(t => t.name === homeTeam) || { rating: 7 };
+        const away = this.teams.find(t => t.name === awayTeam) || { rating: 7 };
+        const res = this.simulateMatch(home, away, true);
+        m.homeGoals = res.homeGoals;
+        m.awayGoals = res.awayGoals;
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    simulateEuropeanMatchday(comp, matchday) {
+        const state = this.getEuropeanPlayableState(comp);
+        const toPlay = state.groupMatches.filter(m => m.matchday === matchday && m.homeGoals == null);
+        toPlay.forEach(m => this.simulateEuropeanGroupMatch(comp, m.homeTeam, m.awayTeam, matchday));
+        this.addActivity(`${this.europeanCompetitions[comp.toUpperCase()].name} ${matchday}. maç günü simüle edildi`);
+    }
+
+    openPlayoffDraw(comp) {
+        const state = this.getEuropeanPlayableState(comp);
+        const standings = this.getEuropeanGroupStandings(comp);
+        const totalPlayed = state.groupMatches.filter(m => m.homeGoals != null).length;
+        if (totalPlayed < state.groupMatches.length) {
+            alert('Önce tüm grup maçlarını oynatın.');
+            return;
+        }
+        state.phase = 'playoff_draw';
+        state.standingsOrder = standings.map(s => s.name);
+        state.playoffPairs = [];
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    drawPlayoffPair(comp, pairIndex, teamA, teamB) {
+        const state = this.getEuropeanPlayableState(comp);
+        if (state.phase !== 'playoff_draw') return;
+        const st = state.standingsOrder || [];
+        const groups = [
+            st.slice(8, 10), st.slice(10, 12), st.slice(12, 14), st.slice(14, 16),
+            st.slice(16, 18), st.slice(18, 20), st.slice(20, 22), st.slice(22, 24)
+        ];
+        const pairOpponent = [7, 6, 5, 4, 3, 2, 1, 0];
+        const pi = parseInt(pairIndex, 10);
+        if (pi < 0 || pi > 3) return;
+        const high = groups[pi], low = groups[pairOpponent[pi]];
+        if (!high || !low || !high.includes(teamA) || !low.includes(teamB)) return;
+        const country1 = this.teams.find(t => t.name === teamA)?.country || this.leagueToCountry[this.teams.find(t => t.name === teamA)?.league];
+        const country2 = this.teams.find(t => t.name === teamB)?.country || this.leagueToCountry[this.teams.find(t => t.name === teamB)?.league];
+        if (country1 === country2) { alert('Aynı ülke eşleşemez.'); return; }
+        if (state.playoffPairs.some(p => p.team1 === teamA || p.team2 === teamA || p.team1 === teamB || p.team2 === teamB)) return;
+        state.playoffPairs.push({ team1: teamA, team2: teamB });
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    finishPlayoffDraw(comp) {
+        const state = this.getEuropeanPlayableState(comp);
+        if (state.phase !== 'playoff_draw' || state.playoffPairs.length < 8) return;
+        state.phase = 'playoff';
+        state.playoffResults = state.playoffPairs.map(p => ({ ...p, leg1Home: null, leg1Away: null, leg2Home: null, leg2Away: null }));
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    simulatePlayoffLeg(comp, pairIndex, leg) {
+        const state = this.getEuropeanPlayableState(comp);
+        const pair = state.playoffResults[pairIndex];
+        if (!pair) return;
+        const [home, away] = leg === 1 ? [pair.team1, pair.team2] : [pair.team2, pair.team1];
+        const h = this.teams.find(t => t.name === home) || { rating: 7 };
+        const a = this.teams.find(t => t.name === away) || { rating: 7 };
+        const res = this.simulateMatch(h, a, true);
+        if (leg === 1) { pair.leg1Home = res.homeGoals; pair.leg1Away = res.awayGoals; } else { pair.leg2Home = res.homeGoals; pair.leg2Away = res.awayGoals; }
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    openR16Draw(comp) {
+        const state = this.getEuropeanPlayableState(comp);
+        const seeded = (state.standingsOrder || []).slice(0, 8);
+        let playoffWinners = [];
+        if (state.playoffResults) playoffWinners = state.playoffResults.map(p => {
+            const g1 = (p.leg1Home || 0) + (p.leg2Away || 0);
+            const g2 = (p.leg1Away || 0) + (p.leg2Home || 0);
+            return g1 > g2 ? p.team1 : g2 > g1 ? p.team2 : (Math.random() > 0.5 ? p.team1 : p.team2);
+        }).filter(Boolean);
+        if (seeded.length !== 8 || playoffWinners.length !== 8) {
+            alert('Önce playoff turlarını tamamlayın (8 eşleşme, her biri 2 maç).');
+            return;
+        }
+        state.phase = 'r16_draw';
+        state.r16Seeded = seeded;
+        state.r16Unseeded = playoffWinners;
+        state.r16Pairs = [];
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    drawR16Pair(comp, seededIdx, unseededIdx) {
+        const state = this.getEuropeanPlayableState(comp);
+        if (state.phase !== 'r16_draw') return;
+        const s = state.r16Seeded[seededIdx];
+        const u = state.r16Unseeded[unseededIdx];
+        if (!s || !u) return;
+        const countryS = this.teams.find(t => t.name === s)?.country;
+        const countryU = this.teams.find(t => t.name === u)?.country;
+        if (countryS === countryU) return;
+        state.r16Pairs.push({ team1: s, team2: u });
+        state.r16Seeded[seededIdx] = null;
+        state.r16Unseeded[unseededIdx] = null;
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    finishR16Draw(comp) {
+        const state = this.getEuropeanPlayableState(comp);
+        if (state.phase !== 'r16_draw' || state.r16Pairs.length !== 8) return;
+        state.phase = 'r16';
+        state.knockoutResults.r16 = state.r16Pairs.map(() => ({}));
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
     }
 
     renderCoefficients() {
         const rankingContainer = document.getElementById('coefficients-ranking');
-        
-        // Get league rankings based on current coefficients
-        const leaguesByCoefficient = Object.entries(this.leagues)
-            .sort((a, b) => b[1].coefficient - a[1].coefficient);
-
-        const europeanAllocationTable = leaguesByCoefficient.map(([leagueName, leagueData], index) => {
+        const countryToLeague = {};
+        Object.keys(this.leagueToCountry).forEach(leagueName => {
+            const c = this.leagueToCountry[leagueName];
+            if (!countryToLeague[c]) countryToLeague[c] = leagueName;
+        });
+        const rows = this.coefficientRanking.map((row, index) => {
             const ranking = index + 1;
-            const uclSpots = this.europeanAllocation.UCL[ranking] || 0;
-            const uelSpots = this.europeanAllocation.UEL[ranking] || 0;
-            const ueclSpots = this.europeanAllocation.UECL[ranking] || 0;
-            
             return {
                 ranking,
-                leagueName,
-                flag: leagueData.flag,
-                coefficient: leagueData.coefficient,
-                ucl: uclSpots,
-                uel: uelSpots,
-                uecl: ueclSpots
+                country: row.countryTr,
+                leagueName: countryToLeague[row.country] || row.country,
+                flag: row.flag,
+                coefficient: row.coefficient,
+                ucl: this.europeanAllocation.UCL[ranking] || 0,
+                uel: this.europeanAllocation.UEL[ranking] || 0,
+                uecl: this.europeanAllocation.UECL[ranking] || 0
             };
         });
-
         rankingContainer.innerHTML = `
-            <h3>2027-28 Sezonu UEFA Katsayıları</h3>
+            <h3>UEFA Katsayıları (Tek Liste)</h3>
             <table class="coefficients-table">
                 <thead>
                     <tr>
                         <th>Sıra</th>
-                        <th>Lig</th>
+                        <th>Ülke / Lig</th>
                         <th>Katsayı</th>
                         <th>UCL</th>
                         <th>UEL</th>
@@ -1397,14 +1950,14 @@ class FootballSimulation {
                     </tr>
                 </thead>
                 <tbody>
-                    ${europeanAllocationTable.map(league => `
+                    ${rows.map(r => `
                         <tr>
-                            <td><strong>${league.ranking}</strong></td>
-                            <td>${league.flag} ${league.leagueName}</td>
-                            <td><strong>${league.coefficient}</strong></td>
-                            <td><span class="ucl-spots">${league.ucl}</span></td>
-                            <td><span class="uel-spots">${league.uel}</span></td>
-                            <td><span class="uecl-spots">${league.uecl}</span></td>
+                            <td><strong>${r.ranking}</strong></td>
+                            <td>${r.flag} ${r.country}</td>
+                            <td><strong>${r.coefficient}</strong></td>
+                            <td><span class="ucl-spots">${r.ucl}</span></td>
+                            <td><span class="uel-spots">${r.uel}</span></td>
+                            <td><span class="uecl-spots">${r.uecl}</span></td>
                         </tr>
                     `).join('')}
                 </tbody>
@@ -1446,12 +1999,14 @@ class FootballSimulation {
 
     advanceSeason() {
         if (confirm('Sonraki sezona geçmek istediğinizden emin misiniz?')) {
-            const currentYear = parseInt(this.currentSeason.split('-')[0]);
+            const endingSeason = this.currentSeason;
+            this.calculateCountryCoefficients(endingSeason);
+            const currentYear = parseInt(endingSeason.split('-')[0]);
             this.currentSeason = `${currentYear + 1}-${(currentYear + 2).toString().slice(-2)}`;
             this.settings.currentSeason = this.currentSeason;
             this.saveSettings();
             this.updateStats();
-            this.addActivity(`${this.currentSeason} sezonuna geçildi`);
+            this.addActivity(`${endingSeason} ülke puanları hesaplandı; ${this.currentSeason} sezonuna geçildi`);
         }
     }
 
@@ -1468,6 +2023,35 @@ class FootballSimulation {
         this.renderWeeklyFixtures();
     }
     
+    renderLiveStandings() {
+        const panel = document.getElementById('live-standings');
+        if (!panel) return;
+        if (!this.currentFixtureLeague) {
+            panel.innerHTML = '<h4>Anlık Puan Durumu</h4><p class="no-data">Lig seçin.</p>';
+            return;
+        }
+        const leagueTeams = this.teams.filter(t => t.league === this.currentFixtureLeague);
+        const leagueMatches = this.getLeagueMatches(this.currentFixtureLeague);
+        const standings = this.calculateStandings(leagueTeams, leagueMatches);
+        const leagueRanking = this.getLeagueRanking(this.currentFixtureLeague);
+        const europeanSpots = this.getEuropeanSpots(leagueRanking);
+        panel.innerHTML = `
+            <h4>${this.currentFixtureLeague} - Anlık Puan Durumu</h4>
+            <div class="live-standings-table-wrap">
+                <table class="league-table live-standings-table">
+                    <thead><tr><th>#</th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>A</th><th>Y</th><th>AV</th><th>P</th></tr></thead>
+                    <tbody>
+                        ${standings.map((t, i) => {
+                            const pos = i + 1;
+                            const rowClass = this.getPositionClass(pos, this.currentFixtureLeague, europeanSpots);
+                            return `<tr class="${rowClass}"><td>${pos}</td><td>${t.name}</td><td>${t.played}</td><td>${t.won}</td><td>${t.drawn}</td><td>${t.lost}</td><td>${t.goalsFor}</td><td>${t.goalsAgainst}</td><td>${t.goalsFor - t.goalsAgainst}</td><td><strong>${t.points}</strong></td></tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+    
     renderWeeklyFixtures() {
         if (!this.currentFixtureLeague) return;
         
@@ -1481,6 +2065,8 @@ class FootballSimulation {
         document.getElementById('next-week-btn').disabled = this.currentFixtureWeek >= maxWeeks;
         
         const fixturesContainer = document.getElementById('weekly-fixtures');
+        
+        this.renderLiveStandings();
         
         if (weekFixtures.length === 0) {
             fixturesContainer.innerHTML = '<p class="no-data">Bu hafta için fikstür bulunamadı.</p>';
@@ -1506,7 +2092,7 @@ class FootballSimulation {
                             <div class="fixture-teams">
                                 <div class="home-team">
                                     <span class="team-name">${fixture.homeTeam.name}</span>
-                                    <span class="team-rating">${fixture.homeTeam.rating}</span>
+                                    <span class="team-rating">${this.normalizeRating(fixture.homeTeam.rating)}</span>
                                 </div>
                                 <div class="fixture-center">
                                     ${existingMatch ? 
@@ -1515,7 +2101,7 @@ class FootballSimulation {
                                     }
                                 </div>
                                 <div class="away-team">
-                                    <span class="team-rating">${fixture.awayTeam.rating}</span>
+                                    <span class="team-rating">${this.normalizeRating(fixture.awayTeam.rating)}</span>
                                     <span class="team-name">${fixture.awayTeam.name}</span>
                                 </div>
                             </div>
@@ -1605,31 +2191,49 @@ class FootballSimulation {
         }
     }
 
+    getTeamPointsList() {
+        return (this.europeanResults || []).map(r => {
+            const team = this.teams.find(t => t.name === r.team);
+            const points = r.points != null ? r.points : this.getEuropeanStagePoints(r.competition, r.stage);
+            const stageLabel = this.europeanStageLabels[r.stage] || r.stage;
+            return {
+                team: r.team,
+                league: team?.league || '',
+                season: r.season,
+                competition: r.competition,
+                stage: r.stage,
+                stageLabel,
+                points
+            };
+        });
+    }
+
+    getLast5Seasons() {
+        const seasons = [...new Set(this.europeanResults.map(r => r.season).filter(Boolean))].sort().reverse();
+        return seasons.slice(0, 5);
+    }
+
     renderTeamPoints() {
         const container = document.getElementById('team-points-table');
-        
-        // Generate sample team points data
-        const teamPoints = this.generateSampleTeamPoints();
-        
-        // Filter by selected league and season
+        const teamPoints = this.getTeamPointsList();
         const selectedLeague = document.getElementById('team-points-league')?.value || '';
         const selectedSeason = document.getElementById('team-points-season')?.value || '';
-        
         let filteredPoints = teamPoints;
-        if (selectedLeague) {
-            filteredPoints = filteredPoints.filter(tp => tp.league === selectedLeague);
-        }
-        if (selectedSeason) {
-            filteredPoints = filteredPoints.filter(tp => tp.season === selectedSeason);
-        }
-        
-        // Sort by points descending
+        if (selectedLeague) filteredPoints = filteredPoints.filter(tp => tp.league === selectedLeague);
+        if (selectedSeason) filteredPoints = filteredPoints.filter(tp => tp.season === selectedSeason);
         filteredPoints.sort((a, b) => b.points - a.points);
+
+        const last5 = this.getLast5Seasons();
+        const seasonOptions = last5.length ? last5 : [this.currentSeason];
+        const seasonSelect = document.getElementById('team-points-season');
+        if (seasonSelect) {
+            seasonSelect.innerHTML = '<option value="">Tüm Sezonlar</option>' + seasonOptions.map(s => `<option value="${s}" ${s === selectedSeason ? 'selected' : ''}>${s}</option>`).join('');
+        }
         
         container.innerHTML = `
             <div class="team-points-summary">
-                <h3>Takım Avrupa Puanları</h3>
-                <p>Toplam ${filteredPoints.length} takım</p>
+                <h3>Takım Avrupa Puanları (Son 5 sezon)</h3>
+                <p>Toplam ${filteredPoints.length} kayıt. Puanlar aşamaya göre otomatik hesaplanır.</p>
             </div>
             <table class="coefficients-table">
                 <thead>
@@ -1644,39 +2248,68 @@ class FootballSimulation {
                     </tr>
                 </thead>
                 <tbody>
-                    ${filteredPoints.map((tp, index) => `
+                    ${filteredPoints.length ? filteredPoints.map((tp, index) => `
                         <tr>
                             <td><strong>${index + 1}</strong></td>
                             <td>${tp.team}</td>
                             <td>${this.leagues[tp.league]?.flag || ''} ${tp.league}</td>
                             <td>${tp.season}</td>
-                            <td><span class="competition-${tp.competition.toLowerCase()}">${tp.competition}</span></td>
-                            <td>${tp.stage}</td>
+                            <td><span class="competition-${(tp.competition || '').toLowerCase()}">${tp.competition || ''}</span></td>
+                            <td>${tp.stageLabel}</td>
                             <td><strong>${tp.points}</strong></td>
                         </tr>
-                    `).join('')}
+                    `).join('') : '<tr><td colspan="7" class="no-data">Henüz Avrupa puanı kaydı yok. Sezon sonu otomatik hesaplanır.</td></tr>'}
                 </tbody>
             </table>
         `;
     }
     
-    generateSampleTeamPoints() {
-        // Return empty array - will be populated with real European results
-        return this.europeanResults || [];
-    }
-    
     renderHistoricalCoefficients() {
         const container = document.getElementById('historical-coefficients');
+        const allSeasons = [...new Set(Object.values(this.countryCoefficients).flatMap(c => Object.keys(c.seasons || {})))].sort().reverse().slice(0, 5);
         
+        if (allSeasons.length === 0) {
         container.innerHTML = `
             <div class="no-data">
-                <h3>Geçmiş Veriler</h3>
-                <p>Henüz geçmiş sezon verileri mevcut değil. Avrupa kupaları oynandıkça buraya veriler eklenecek.</p>
-                <div class="current-coefficients" style="margin-top: 2rem;">
-                    <h4>2027-28 Sezonu Son Durumu</h4>
-                    <p>Mevcut katsayı sıralamasına göre bir sonraki sezon için Avrupa kupaları katylımı:</p>
+                    <h3>Son 5 Sezon Ülke Puanları</h3>
+                    <p>Henüz hesaplanmış sezon yok. "Sonraki Sezon" ile sezonu bitirdiğinizde o sezonun ülke puanları (toplam takım puanı / o ülkenin Avrupa'ya gönderdiği takım sayısı) otomatik eklenir.</p>
                 </div>
+            `;
+            return;
+        }
+
+        const rows = allSeasons.map(season => {
+            const byCountry = this.countryCoefficients.filter(c => c.seasons && c.seasons[season]).map(c => ({
+                country: c.country,
+                coefficient: c.seasons[season].coefficient,
+                points: c.seasons[season].points,
+                teams: c.seasons[season].teams
+            })).sort((a, b) => b.coefficient - a.coefficient);
+            return { season, byCountry };
+        });
+
+        container.innerHTML = `
+            <h3>Son ${allSeasons.length} Sezon Ülke Puanları</h3>
+            <p>Ülke puanı = o sezon o ülkenin takımlarının toplam Avrupa puanı / Avrupa kupalarına gönderilen takım sayısı.</p>
+            ${rows.map(({ season, byCountry }) => `
+                <div class="historical-season-block">
+                    <h4>${season}</h4>
+                    <table class="coefficients-table">
+                        <thead><tr><th>Sıra</th><th>Ülke</th><th>Toplam Puan</th><th>Takım Sayısı</th><th>Ülke Puanı</th></tr></thead>
+                        <tbody>
+                            ${byCountry.map((row, i) => `
+                                <tr>
+                                    <td><strong>${i + 1}</strong></td>
+                                    <td>${this.coefficientRanking.find(r => r.country === row.country)?.flag || ''} ${row.country}</td>
+                                    <td>${row.points}</td>
+                                    <td>${row.teams}</td>
+                                    <td><strong>${row.coefficient.toFixed(2)}</strong></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
             </div>
+            `).join('')}
         `;
     }
     
@@ -1733,6 +2366,11 @@ class FootballSimulation {
 // Global functions for HTML onclick handlers
 function showSection(section) {
     window.footballSim.showSection(section);
+}
+
+function onLeagueSeasonChange(leagueName) {
+    const sel = document.getElementById('league-season-select');
+    if (sel) window.footballSim.showLeagueTable(leagueName, sel.value);
 }
 
 function showAddTeamModal() {
