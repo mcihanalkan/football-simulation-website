@@ -457,6 +457,14 @@
         </div>
     </div>
 
+    <!-- Team Profile Modal -->
+    <div id="team-profile-modal" class="modal">
+        <div class="modal-content team-profile-modal-content">
+            <span class="close" onclick="closeModal('team-profile-modal')">&times;</span>
+            <div id="team-profile-content"></div>
+        </div>
+    </div>
+
     <div id="match-details-modal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('match-details-modal')">&times;</span>
@@ -464,6 +472,37 @@
             <div id="match-details-content">
                 <!-- Match details will be populated here -->
             </div>
+        </div>
+    </div>
+
+    <!-- Add Player Modal -->
+    <div id="add-player-modal" class="modal">
+        <!-- Content filled dynamically -->
+    </div>
+
+    <!-- Player Profile Modal -->
+    <div id="player-profile-modal" class="modal">
+        <div class="modal-content player-profile-modal-content">
+            <span class="close" onclick="document.getElementById('player-profile-modal').classList.remove('show')">&times;</span>
+            <div id="player-profile-content"></div>
+        </div>
+    </div>
+
+    <!-- Edit Player Modal -->
+    <div id="edit-player-modal" class="modal">
+        <!-- Content filled dynamically -->
+    </div>
+
+    <!-- Coach Profile Modal -->
+    <div id="coach-modal" class="modal">
+        <!-- Content filled dynamically -->
+    </div>
+
+    <!-- Match Player Stats Modal (for clicking player in match screen) -->
+    <div id="match-player-stats-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('match-player-stats-modal').classList.remove('show')">&times;</span>
+            <div id="match-player-stats-content"></div>
         </div>
     </div>
 
