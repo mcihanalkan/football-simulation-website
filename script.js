@@ -934,71 +934,1203 @@ class FootballSimulation {
         return simulatedMatches;
     }
 
+    // ==================== OYUNCU & KADRO SİSTEMİ ====================
+
+    // Oyuncu rol tipleri
+    getPlayerRoles() {
+        return [
+            { id: 'ilk11', label: 'İlk 11 (Çoğu maçta oynar)', priority: 1 },
+            { id: 'rotasyon', label: 'Rotasyon (Kolay maçlarda oynar)', priority: 3 },
+            { id: 'yedek', label: 'Yedek (Çoğunlukla yedekten girer)', priority: 4 },
+            { id: 'kararliYedek', label: 'Yarı yedek (Bazen oynar, bazen yedek)', priority: 2 },
+            { id: 'gencYedek', label: 'Genç/Yedek (Nadiren oynar)', priority: 5 }
+        ];
+    }
+
+    // Mevkiler
+    getPositions() {
+        return [
+            'Kaleci', 'Stoper', 'Sol Bek', 'Sağ Bek',
+            'Ön Libero', 'Merkez Orta Saha', 'Ofansif Orta Saha',
+            'Forvet Arkası', 'Sol Kanat', 'Sağ Kanat', 'Santrafor'
+        ];
+    }
+
+    // Takımın oyuncularını getir
+    getTeamPlayers(teamName) {
+        const team = this.teams.find(t => t.name === teamName);
+        return (team && team.players) ? team.players : [];
+    }
+
+    // Oyuncu ekle
+    addPlayerToTeam(teamName, player) {
+        const teamIdx = this.teams.findIndex(t => t.name === teamName);
+        if (teamIdx === -1) return false;
+        if (!this.teams[teamIdx].players) this.teams[teamIdx].players = [];
+        const newPlayer = {
+            id: Date.now() + Math.random(),
+            ...player,
+            yellowCards: 0,        // toplam sarı kart (sezon geneli)
+            redCards: 0,
+            suspendedMatches: 0,   // cezalı kaldığı maç sayısı
+            matchStats: {},        // matchId -> stats
+            cardsHistory: []       // { matchId, type, week }
+        };
+        this.teams[teamIdx].players.push(newPlayer);
+        this.saveData();
+        return true;
+    }
+
+    // Oyuncu sil
+    removePlayerFromTeam(teamName, playerId) {
+        const teamIdx = this.teams.findIndex(t => t.name === teamName);
+        if (teamIdx === -1) return;
+        this.teams[teamIdx].players = (this.teams[teamIdx].players || []).filter(p => p.id !== playerId);
+        this.saveData();
+    }
+
+    // Maç zorluğuna göre kadro seçimi
+    selectMatchSquad(teamName, opponentName, matchDifficulty) {
+        // matchDifficulty: 'easy' | 'normal' | 'hard'
+        const players = this.getTeamPlayers(teamName);
+        if (players.length === 0) return { starting: [], bench: [] };
+
+        // Takımın hocasını bul
+        const team = this.teams.find(t => t.name === teamName);
+        const coach = team?.coach;
+        const formation = coach?.preferredFormation || '4-4-2';
+
+        // Cezalı oyuncuları çıkar
+        const available = players.filter(p => (p.suspendedMatches || 0) === 0);
+
+        // Role priority: ilk11=1, kararliYedek=2, rotasyon=3, yedek=4, gencYedek=5
+        // Zor maçta: ilk11 önce, kararliYedek sonra
+        // Normal: ilk11 ağırlıklı, biraz rotasyon
+        // Kolay: rotasyon ve kararliYedek de oynayabilir
+
+        const byRole = {};
+        available.forEach(p => {
+            if (!byRole[p.role]) byRole[p.role] = [];
+            byRole[p.role].push(p);
+        });
+
+        // Her pozisyondan en iyi oyuncuyu seç
+        const positionGroups = {};
+        available.forEach(p => {
+            if (!positionGroups[p.position]) positionGroups[p.position] = [];
+            positionGroups[p.position].push(p);
+        });
+        // Her pozisyon grubu kendi içinde reyting + role'e göre sıralı
+        Object.keys(positionGroups).forEach(pos => {
+            positionGroups[pos].sort((a, b) => {
+                const rolePriorityA = this.getPlayerRoles().find(r => r.id === a.role)?.priority || 5;
+                const rolePriorityB = this.getPlayerRoles().find(r => r.id === b.role)?.priority || 5;
+                // Zor maçta role öncelikli, kolay maçta reyting öncelikli
+                if (matchDifficulty === 'hard') {
+                    if (rolePriorityA !== rolePriorityB) return rolePriorityA - rolePriorityB;
+                    return b.rating - a.rating;
+                } else if (matchDifficulty === 'easy') {
+                    // Rotasyon oyuncuları öne geçebilir
+                    const adjustedA = rolePriorityA + (a.role === 'rotasyon' ? -1.5 : 0);
+                    const adjustedB = rolePriorityB + (b.role === 'rotasyon' ? -1.5 : 0);
+                    if (adjustedA !== adjustedB) return adjustedA - adjustedB;
+                    return b.rating - a.rating;
+                } else {
+                    // Normal: yarı yarıya
+                    if (rolePriorityA !== rolePriorityB) return rolePriorityA - rolePriorityB;
+                    return b.rating - a.rating;
+                }
+            });
+        });
+
+        // İlk 11 seçimi: en fazla 11 oyuncu, benzersiz pozisyonlar
+        const startingIds = new Set();
+        const starting = [];
+        // Önce kaleci
+        const keepers = (positionGroups['Kaleci'] || []);
+        if (keepers.length > 0) { starting.push(keepers[0]); startingIds.add(keepers[0].id); }
+
+        // Sonra diğerleri (mevkiye göre)
+        const outfieldOrder = ['Stoper','Sol Bek','Sağ Bek','Ön Libero','Merkez Orta Saha','Ofansif Orta Saha','Forvet Arkası','Sol Kanat','Sağ Kanat','Santrafor'];
+        outfieldOrder.forEach(pos => {
+            const group = (positionGroups[pos] || []).filter(p => !startingIds.has(p.id));
+            const needed = starting.length < 11 ? 1 : 0;
+            group.slice(0, needed).forEach(p => { starting.push(p); startingIds.add(p.id); });
+        });
+
+        // Eğer hâlâ 11'den az oyuncu varsa, kalan available'dan doldur
+        if (starting.length < 11) {
+            available.filter(p => !startingIds.has(p.id))
+                .sort((a,b) => a.rating - b.rating) // Daha düşük reyting yedek gitsin
+                .slice(0, 11 - starting.length)
+                .forEach(p => { starting.push(p); startingIds.add(p.id); });
+        }
+
+        // Yedekler (maks 5, ilk 11 dışındakiler)
+        const bench = available
+            .filter(p => !startingIds.has(p.id))
+            .sort((a,b) => (this.getPlayerRoles().find(r=>r.id===a.role)?.priority||5) - (this.getPlayerRoles().find(r=>r.id===b.role)?.priority||5))
+            .slice(0, 5);
+
+        return { starting, bench };
+    }
+
+    // Maç zorluğunu hesapla
+    getMatchDifficulty(homeRating, awayRating, isHome) {
+        const teamRating = isHome ? homeRating : awayRating;
+        const opponentRating = isHome ? awayRating : homeRating;
+        const diff = teamRating - opponentRating;
+        if (diff > 1.5) return 'easy';
+        if (diff < -1.0) return 'hard';
+        return 'normal';
+    }
+
+    // ==================== GELİŞTİRİLMİŞ MAÇ SİMÜLASYONU ====================
+
     // Match Simulation Engine (0.5-9.9 reyting)
     simulateMatch(homeTeam, awayTeam, isEuropean = false) {
         const homeAdvantageBoost = (this.settings.homeAdvantage / 100) * 0.15;
         const homeRating = this.normalizeRating(homeTeam.rating) + (isEuropean ? homeAdvantageBoost * 0.8 : homeAdvantageBoost);
         const awayRating = this.normalizeRating(awayTeam.rating);
         
-        // More balanced probability calculation
         const ratingDiff = homeRating - awayRating;
-        
-        // Reduced sensitivity to prevent extreme results
         let homeWinProb = 0.45 + (ratingDiff * 0.06) * (this.settings.ratingEffect / 100);
-        
-        // Consistent draw probability
         const drawProb = Math.max(0.20, 0.32 - (Math.abs(ratingDiff) * 0.02));
-        
-        // Ensure more balanced probabilities
         homeWinProb = Math.max(0.15, Math.min(0.70, homeWinProb));
         const awayWinProb = Math.max(0.15, 1 - homeWinProb - drawProb);
-        
-        // Normalize probabilities
         const totalProb = homeWinProb + drawProb + awayWinProb;
         const normalizedHomeWin = homeWinProb / totalProb;
         const normalizedDraw = drawProb / totalProb;
         
         const random = Math.random();
         let result;
-        
-        if (random < normalizedHomeWin) {
-            result = 'H';
-        } else if (random < normalizedHomeWin + normalizedDraw) {
-            result = 'D';
-        } else {
-            result = 'A';
-        }
+        if (random < normalizedHomeWin) result = 'H';
+        else if (random < normalizedHomeWin + normalizedDraw) result = 'D';
+        else result = 'A';
 
-        // More realistic goal generation
         let homeGoals, awayGoals;
-        
         if (result === 'D') {
-            // For draws, ensure both teams have same goals
-            const drawGoals = Math.floor(Math.random() * 3); // 0, 1, or 2 goals typically
-            homeGoals = drawGoals;
-            awayGoals = drawGoals;
+            const drawGoals = Math.floor(Math.random() * 3);
+            homeGoals = drawGoals; awayGoals = drawGoals;
         } else {
             homeGoals = this.generateGoals(homeRating, awayRating, result === 'H');
             awayGoals = this.generateGoals(awayRating, homeRating, result === 'A');
-            
-            // Ensure winner has more goals
-            if (result === 'H' && homeGoals <= awayGoals) {
-                homeGoals = awayGoals + 1;
-            } else if (result === 'A' && awayGoals <= homeGoals) {
-                awayGoals = homeGoals + 1;
-            }
+            if (result === 'H' && homeGoals <= awayGoals) homeGoals = awayGoals + 1;
+            else if (result === 'A' && awayGoals <= homeGoals) awayGoals = homeGoals + 1;
         }
 
+        homeGoals = Math.min(homeGoals, 5);
+        awayGoals = Math.min(awayGoals, 5);
+
+        // Kadro seçimi
+        const homeDifficulty = this.getMatchDifficulty(homeRating, awayRating, true);
+        const awayDifficulty = this.getMatchDifficulty(homeRating, awayRating, false);
+        const homeSquad = this.selectMatchSquad(homeTeam.name, awayTeam.name, homeDifficulty);
+        const awaySquad = this.selectMatchSquad(awayTeam.name, homeTeam.name, awayDifficulty);
+
+        // Maç istatistikleri üret
+        const matchStats = this.generateMatchStats(homeTeam, awayTeam, homeGoals, awayGoals, homeRating, awayRating, homeSquad, awaySquad);
+
+        // Oyuncu istatistikleri üret
+        const playerStats = this.generatePlayerStats(homeSquad, awaySquad, homeGoals, awayGoals, result, homeRating, awayRating, homeTeam.name, awayTeam.name);
+
+        // Ceza ve kart işlemleri
+        this.processCardsAndSuspensions(homeTeam.name, awayTeam.name, playerStats, matchStats);
+
+        // Cezalı oyunculardaki suspendedMatches'ı azalt
+        this.decreaseSuspensions(homeTeam.name);
+        this.decreaseSuspensions(awayTeam.name);
+
+        const matchId = `${homeTeam.name}_${awayTeam.name}_${this.currentSeason}_${Date.now()}`;
+
+        // Events listesini playerStats ile zenginleştir
+        const enrichEvents = (events, playerStats, homeTeamName, awayTeamName, homeSquad, awaySquad) => {
+            // Gol atan oyuncuları bul
+            const homeScorers = Object.entries(playerStats)
+                .filter(([id, ps]) => ps.teamName === homeTeamName && ps.goals > 0)
+                .flatMap(([id, ps]) => {
+                    const player = [...(homeSquad.starting || []), ...(homeSquad.bench || [])].find(p => String(p.id) === String(id));
+                    return Array(ps.goals).fill(player?.name || '?');
+                });
+            const awayScorers = Object.entries(playerStats)
+                .filter(([id, ps]) => ps.teamName === awayTeamName && ps.goals > 0)
+                .flatMap(([id, ps]) => {
+                    const player = [...(awaySquad.starting || []), ...(awaySquad.bench || [])].find(p => String(p.id) === String(id));
+                    return Array(ps.goals).fill(player?.name || '?');
+                });
+
+            // Asist yapanları bul
+            const homeAssistors = Object.entries(playerStats)
+                .filter(([id, ps]) => ps.teamName === homeTeamName && ps.assists > 0)
+                .flatMap(([id, ps]) => {
+                    const player = [...(homeSquad.starting || []), ...(homeSquad.bench || [])].find(p => String(p.id) === String(id));
+                    return Array(ps.assists).fill(player?.name || '?');
+                });
+            const awayAssistors = Object.entries(playerStats)
+                .filter(([id, ps]) => ps.teamName === awayTeamName && ps.assists > 0)
+                .flatMap(([id, ps]) => {
+                    const player = [...(awaySquad.starting || []), ...(awaySquad.bench || [])].find(p => String(p.id) === String(id));
+                    return Array(ps.assists).fill(player?.name || '?');
+                });
+
+            // Sarı kart alan oyuncuları bul
+            const homeYellowPlayers = Object.entries(playerStats)
+                .filter(([id, ps]) => ps.teamName === homeTeamName && ps.yellowCard)
+                .map(([id]) => [...(homeSquad.starting || []), ...(homeSquad.bench || [])].find(p => String(p.id) === String(id))?.name || '?');
+            const awayYellowPlayers = Object.entries(playerStats)
+                .filter(([id, ps]) => ps.teamName === awayTeamName && ps.yellowCard)
+                .map(([id]) => [...(awaySquad.starting || []), ...(awaySquad.bench || [])].find(p => String(p.id) === String(id))?.name || '?');
+
+            // Kırmızı kart alan oyuncuları bul
+            const homeRedPlayers = Object.entries(playerStats)
+                .filter(([id, ps]) => ps.teamName === homeTeamName && ps.redCard)
+                .map(([id]) => [...(homeSquad.starting || []), ...(homeSquad.bench || [])].find(p => String(p.id) === String(id))?.name || '?');
+            const awayRedPlayers = Object.entries(playerStats)
+                .filter(([id, ps]) => ps.teamName === awayTeamName && ps.redCard)
+                .map(([id]) => [...(awaySquad.starting || []), ...(awaySquad.bench || [])].find(p => String(p.id) === String(id))?.name || '?');
+
+            // Değişiklik yapan oyuncuları bul
+            const homeSubsOut = Object.entries(playerStats)
+                .filter(([id, ps]) => ps.teamName === homeTeamName && ps.subOff)
+                .map(([id, ps]) => ({ name: [...(homeSquad.starting || []), ...(homeSquad.bench || [])].find(p => String(p.id) === String(id))?.name || '?', minute: ps.subMinute, playerIn: ps.subPlayer }));
+            const awaySubsOut = Object.entries(playerStats)
+                .filter(([id, ps]) => ps.teamName === awayTeamName && ps.subOff)
+                .map(([id, ps]) => ({ name: [...(awaySquad.starting || []), ...(awaySquad.bench || [])].find(p => String(p.id) === String(id))?.name || '?', minute: ps.subMinute, playerIn: ps.subPlayer }));
+
+            let hGoalIdx = 0, aGoalIdx = 0, hYellowIdx = 0, aYellowIdx = 0;
+            let hRedIdx = 0, aRedIdx = 0;
+            let hSubIdx = 0, aSubIdx = 0;
+
+            return events.map(e => {
+                const enriched = { ...e };
+                if (e.type === 'goal') {
+                    if (e.team === 'home') {
+                        enriched.player = homeScorers[hGoalIdx] || '?';
+                        enriched.assist = homeAssistors[hGoalIdx] || null;
+                        hGoalIdx++;
+                    } else {
+                        enriched.player = awayScorers[aGoalIdx] || '?';
+                        enriched.assist = awayAssistors[aGoalIdx] || null;
+                        aGoalIdx++;
+                    }
+                } else if (e.type === 'yellow') {
+                    if (e.team === 'home') { enriched.player = homeYellowPlayers[hYellowIdx] || '?'; hYellowIdx++; }
+                    else { enriched.player = awayYellowPlayers[aYellowIdx] || '?'; aYellowIdx++; }
+                } else if (e.type === 'red') {
+                    if (e.team === 'home') { enriched.player = homeRedPlayers[hRedIdx] || '?'; hRedIdx++; }
+                    else { enriched.player = awayRedPlayers[aRedIdx] || '?'; aRedIdx++; }
+                } else if (e.type === 'sub') {
+                    if (e.team === 'home' && homeSubsOut[hSubIdx]) {
+                        enriched.playerOut = homeSubsOut[hSubIdx].name;
+                        enriched.playerIn = homeSubsOut[hSubIdx].playerIn || '?';
+                        hSubIdx++;
+                    } else if (e.team === 'away' && awaySubsOut[aSubIdx]) {
+                        enriched.playerOut = awaySubsOut[aSubIdx].name;
+                        enriched.playerIn = awaySubsOut[aSubIdx].playerIn || '?';
+                        aSubIdx++;
+                    }
+                }
+                return enriched;
+            });
+        };
+
+        const enrichedEvents = enrichEvents(matchStats.events, playerStats, homeTeam.name, awayTeam.name, homeSquad, awaySquad);
+        matchStats.events = enrichedEvents;
+
         return {
+            id: matchId,
             homeTeam: homeTeam.name,
             awayTeam: awayTeam.name,
-            homeGoals: Math.min(homeGoals, 5), // Cap at 5 goals max
-            awayGoals: Math.min(awayGoals, 5), // Cap at 5 goals max
+            homeGoals,
+            awayGoals,
             result,
             season: this.currentSeason,
-            date: new Date().toISOString().split('T')[0]
+            date: new Date().toISOString().split('T')[0],
+            homeSquad,
+            awaySquad,
+            stats: matchStats,
+            playerStats,
+            events: matchStats.events
         };
     }
+
+    generateMatchStats(homeTeam, awayTeam, homeGoals, awayGoals, homeRating, awayRating, homeSquad, awaySquad) {
+        // Maç istatistikleri - gol, topla oynama, şut, korner, faul, ofsayt
+        const homeStrength = homeRating / (homeRating + awayRating);
+        const awayStrength = 1 - homeStrength;
+
+        const homePoss = Math.round(35 + homeStrength * 30 + (Math.random() * 10 - 5));
+        const awayPoss = 100 - homePoss;
+
+        const homeShots = Math.max(homeGoals * 2, Math.round(6 + homeStrength * 12 + Math.random() * 6));
+        const awayShots = Math.max(awayGoals * 2, Math.round(6 + awayStrength * 12 + Math.random() * 6));
+        const homeShotsOT = Math.max(homeGoals, Math.round(homeGoals + Math.random() * (homeShots - homeGoals) * 0.5));
+        const awayShotsOT = Math.max(awayGoals, Math.round(awayGoals + Math.random() * (awayShots - awayGoals) * 0.5));
+
+        const homeCorners = Math.round(2 + homeStrength * 8 + Math.random() * 4);
+        const awayCorners = Math.round(2 + awayStrength * 8 + Math.random() * 4);
+        const homeFouls = Math.round(8 + Math.random() * 10);
+        const awayFouls = Math.round(8 + Math.random() * 10);
+        const homeOffsides = Math.round(Math.random() * 5);
+        const awayOffsides = Math.round(Math.random() * 5);
+
+        // Sarı kart sayısı (foula göre orantılı)
+        const homeYellows = Math.round((homeFouls / 18) * (Math.random() * 4));
+        const awayYellows = Math.round((awayFouls / 18) * (Math.random() * 4));
+
+        // Olaylar listesi
+        const events = [];
+
+        // Gol zamanları
+        const homeGoalTimes = this.randomMinutes(homeGoals, 1, 90);
+        const awayGoalTimes = this.randomMinutes(awayGoals, 1, 90);
+
+        homeGoalTimes.forEach(min => events.push({ min, type: 'goal', team: 'home', isPenalty: Math.random() < 0.08 }));
+        awayGoalTimes.forEach(min => events.push({ min, type: 'goal', team: 'away', isPenalty: Math.random() < 0.08 }));
+
+        // Sarı kartlar
+        const homeYellowTimes = this.randomMinutes(homeYellows, 10, 90);
+        const awayYellowTimes = this.randomMinutes(awayYellows, 10, 90);
+        homeYellowTimes.forEach(min => events.push({ min, type: 'yellow', team: 'home' }));
+        awayYellowTimes.forEach(min => events.push({ min, type: 'yellow', team: 'away' }));
+
+        // Kırmızı kart (nadir)
+        const homeRed = Math.random() < 0.04;
+        const awayRed = Math.random() < 0.04;
+        if (homeRed) events.push({ min: Math.round(30 + Math.random() * 55), type: 'red', team: 'home', direct: Math.random() < 0.5 });
+        if (awayRed) events.push({ min: Math.round(30 + Math.random() * 55), type: 'red', team: 'away', direct: Math.random() < 0.5 });
+
+        // Değişiklikler yer tutucu (oyuncu stat'larından populate edilecek)
+        const homeSubs = Math.round(2 + Math.random() * 3);
+        const awaySubs = Math.round(2 + Math.random() * 3);
+        const homeSubTimes = this.randomMinutes(homeSubs, 46, 85);
+        const awaySubTimes = this.randomMinutes(awaySubs, 46, 85);
+        homeSubTimes.forEach(min => events.push({ min, type: 'sub', team: 'home', playerOut: '', playerIn: '' }));
+        awaySubTimes.forEach(min => events.push({ min, type: 'sub', team: 'away', playerOut: '', playerIn: '' }));
+
+        events.sort((a, b) => a.min - b.min);
+
+        return {
+            possession: { home: homePoss, away: awayPoss },
+            shots: { home: homeShots, away: awayShots },
+            shotsOnTarget: { home: homeShotsOT, away: awayShotsOT },
+            corners: { home: homeCorners, away: awayCorners },
+            fouls: { home: homeFouls, away: awayFouls },
+            offsides: { home: homeOffsides, away: awayOffsides },
+            yellowCards: { home: homeYellows, away: awayYellows },
+            redCards: { home: homeRed ? 1 : 0, away: awayRed ? 1 : 0 },
+            events
+        };
+    }
+
+    randomMinutes(count, min, max) {
+        const times = [];
+        for (let i = 0; i < count; i++) {
+            times.push(Math.round(min + Math.random() * (max - min)));
+        }
+        return times.sort((a, b) => a - b);
+    }
+
+    generatePlayerStats(homeSquad, awaySquad, homeGoals, awayGoals, result, homeRating, awayRating, homeTeamName, awayTeamName) {
+        const stats = {};
+        const homeStarting = homeSquad.starting || [];
+        const awayStarting = awaySquad.starting || [];
+        const homeBench = homeSquad.bench || [];
+        const awayBench = awaySquad.bench || [];
+
+        // İlk önce tüm oyuncular için temel istatistik kaydı oluştur
+        const initPlayerStat = (player, teamName, isStarting) => {
+            stats[player.id] = {
+                goals: 0,
+                assists: 0,
+                yellowCard: false,
+                redCard: false,
+                redCardType: null,
+                minutesPlayed: 0,
+                rating: 6.0,
+                teamName,
+                position: player.position || '',
+                isStarting,
+                teamWon: false,
+                teamLost: false,
+                // Mevkiye özel
+                saves: 0,
+                cleanSheet: false,
+                goalsConceded: 0,
+                tackles: 0,
+                interceptions: 0,
+                clearances: 0,
+                duelsWon: 0,
+                passAccuracy: 0,
+                chances: 0,
+                shots: 0,
+                shotsOnTarget: 0,
+                keyPasses: 0,
+                dribbles: 0,
+                crosses: 0,
+                aerialDuels: 0,
+                subOn: false,
+                subOff: false,
+                subMinute: null,
+                subPlayer: null // kimin yerine
+            };
+        };
+
+        [...homeStarting, ...homeBench].forEach(p => initPlayerStat(p, homeTeamName, homeStarting.some(s => s.id === p.id)));
+        [...awayStarting, ...awayBench].forEach(p => initPlayerStat(p, awayTeamName, awayStarting.some(s => s.id === p.id)));
+
+        // Takım sonuçları
+        const homeWon = result === 'H', awayWon = result === 'A';
+        [...homeStarting, ...homeBench].forEach(p => {
+            if (stats[p.id]) { stats[p.id].teamWon = homeWon; stats[p.id].teamLost = awayWon; }
+        });
+        [...awayStarting, ...awayBench].forEach(p => {
+            if (stats[p.id]) { stats[p.id].teamWon = awayWon; stats[p.id].teamLost = homeWon; }
+        });
+
+        // ——— DEĞIŞIKLIKLER (tutarlı) ———
+        // Her takım 2-5 değişiklik yapar, yedekten girer
+        const applySubstitutions = (starting, bench, teamName) => {
+            const subCount = Math.min(bench.length, Math.round(2 + Math.random() * 3));
+            const shuffledBench = [...bench].sort(() => Math.random() - 0.5);
+            const shuffledStarting = [...starting].filter(p => p.position !== 'Kaleci').sort(() => Math.random() - 0.5);
+            for (let i = 0; i < subCount && i < shuffledStarting.length; i++) {
+                const playerOut = shuffledStarting[i];
+                const playerIn = shuffledBench[i];
+                if (!playerOut || !playerIn) continue;
+                const subMin = Math.round(46 + Math.random() * 44);
+                if (stats[playerOut.id]) {
+                    stats[playerOut.id].subOff = true;
+                    stats[playerOut.id].subMinute = subMin;
+                    stats[playerOut.id].minutesPlayed = subMin;
+                    stats[playerOut.id].subPlayer = playerIn.name;
+                }
+                if (stats[playerIn.id]) {
+                    stats[playerIn.id].subOn = true;
+                    stats[playerIn.id].subMinute = subMin;
+                    stats[playerIn.id].minutesPlayed = 90 - subMin;
+                    stats[playerIn.id].subPlayer = playerOut.name;
+                }
+            }
+        };
+        applySubstitutions(homeStarting, homeBench, homeTeamName);
+        applySubstitutions(awayStarting, awayBench, awayTeamName);
+
+        // Oynanmayan yedeklere 0 dakika
+        [...homeStarting, ...homeBench, ...awayStarting, ...awayBench].forEach(p => {
+            if (stats[p.id] && stats[p.id].minutesPlayed === 0) {
+                const isStart = homeStarting.some(s => s.id === p.id) || awayStarting.some(s => s.id === p.id);
+                if (isStart) {
+                    stats[p.id].minutesPlayed = 90; // Başladı, değiştirilmedi
+                }
+                // else: bench'te kaldı, 0 dakika
+            }
+        });
+
+        // ——— GOL DAĞITIMI (sadece oynayan oyuncular) ———
+        const playingHome = [...homeStarting, ...homeBench].filter(p => stats[p.id]?.minutesPlayed > 0);
+        const playingAway = [...awayStarting, ...awayBench].filter(p => stats[p.id]?.minutesPlayed > 0);
+
+        this.distributeGoals(playingHome, homeGoals, stats, 'home', homeTeamName);
+        this.distributeGoals(playingAway, awayGoals, stats, 'away', awayTeamName);
+
+        // ——— ASİST DAĞITIMI ———
+        this.distributeAssists(playingHome, homeGoals, stats, 'home', homeTeamName);
+        this.distributeAssists(playingAway, awayGoals, stats, 'away', awayTeamName);
+
+        // ——— MEVKIYE ÖZEL İSTATİSTİKLER ———
+        const applyPositionStats = (players, isHome) => {
+            players.filter(p => stats[p.id]?.minutesPlayed > 0).forEach(p => {
+                const ps = stats[p.id];
+                const pos = p.position || '';
+                const mins = ps.minutesPlayed || 0;
+                const minFactor = mins / 90; // Oynama süresine göre istatistik ölçekle
+
+                if (pos === 'Kaleci') {
+                    const opponentGoals = isHome ? awayGoals : homeGoals;
+                    ps.saves = Math.round((opponentGoals * 1.5 + Math.random() * 4) * minFactor);
+                    ps.goalsConceded = opponentGoals;
+                    ps.cleanSheet = opponentGoals === 0;
+                } else if (['Stoper', 'Sol Bek', 'Sağ Bek'].includes(pos)) {
+                    ps.tackles = Math.round((1 + Math.random() * 5) * minFactor);
+                    ps.interceptions = Math.round((0 + Math.random() * 3) * minFactor);
+                    ps.clearances = Math.round((1 + Math.random() * 6) * minFactor);
+                    ps.duelsWon = Math.round((1 + Math.random() * 4) * minFactor);
+                } else if (['Ön Libero', 'Merkez Orta Saha'].includes(pos)) {
+                    ps.tackles = Math.round((1 + Math.random() * 4) * minFactor);
+                    ps.interceptions = Math.round((0 + Math.random() * 3) * minFactor);
+                    ps.passAccuracy = Math.round(70 + Math.random() * 20);
+                    ps.chances = Math.round(Math.random() * 2 * minFactor);
+                } else if (['Ofansif Orta Saha', 'Forvet Arkası'].includes(pos)) {
+                    ps.shots = Math.round((1 + Math.random() * 3) * minFactor);
+                    ps.shotsOnTarget = Math.min(ps.shots, Math.round(Math.random() * 2 * minFactor));
+                    ps.keyPasses = Math.round((0 + Math.random() * 3) * minFactor);
+                    ps.chances = Math.round((0 + Math.random() * 2) * minFactor);
+                    ps.dribbles = Math.round(Math.random() * 3 * minFactor);
+                } else if (['Sol Kanat', 'Sağ Kanat'].includes(pos)) {
+                    ps.shots = Math.round((1 + Math.random() * 3) * minFactor);
+                    ps.shotsOnTarget = Math.min(ps.shots, Math.round(Math.random() * 2 * minFactor));
+                    ps.crosses = Math.round((1 + Math.random() * 4) * minFactor);
+                    ps.dribbles = Math.round((1 + Math.random() * 4) * minFactor);
+                    ps.chances = Math.round(Math.random() * 2 * minFactor);
+                } else if (pos === 'Santrafor') {
+                    ps.shots = Math.max(ps.goals, Math.round((1 + Math.random() * 5) * minFactor));
+                    ps.shotsOnTarget = Math.min(ps.shots, Math.max(ps.goals, Math.round((1 + Math.random() * 3) * minFactor)));
+                    ps.chances = Math.round((0 + Math.random() * 3) * minFactor);
+                    ps.aerialDuels = Math.round((0 + Math.random() * 4) * minFactor);
+                }
+
+                // Şut istatistiğini gol sayısıyla uyumlu kıl
+                if (ps.shots !== undefined) ps.shots = Math.max(ps.goals, ps.shots);
+                if (ps.shotsOnTarget !== undefined) ps.shotsOnTarget = Math.max(ps.goals, Math.min(ps.shots || ps.goals, ps.shotsOnTarget));
+            });
+        };
+        applyPositionStats([...homeStarting, ...homeBench], true);
+        applyPositionStats([...awayStarting, ...awayBench], false);
+
+        // ——— REYTING (mevkiye özel formül) ———
+        [...homeStarting, ...homeBench, ...awayStarting, ...awayBench].forEach(p => {
+            if (stats[p.id] && stats[p.id].minutesPlayed > 0) {
+                stats[p.id].rating = this.calculatePlayerRating(stats[p.id], p.position);
+            }
+        });
+
+        return stats;
+    }
+
+    distributeGoals(players, goalCount, stats, side, teamName) {
+        if (goalCount === 0 || players.length === 0) return;
+        // Forvetler ve kanatlara daha yüksek olasılık
+        const weights = players.map(p => {
+            let w = 1;
+            if (p.position === 'Santrafor') w = 5;
+            else if (p.position === 'Sol Kanat' || p.position === 'Sağ Kanat') w = 3;
+            else if (p.position === 'Forvet Arkası' || p.position === 'Ofansif Orta Saha') w = 2;
+            else if (p.position === 'Stoper' || p.position === 'Kaleci') w = 0.1;
+            return w;
+        });
+        const totalW = weights.reduce((a, b) => a + b, 0);
+        for (let g = 0; g < goalCount; g++) {
+            let rand = Math.random() * totalW;
+            for (let i = 0; i < players.length; i++) {
+                rand -= weights[i];
+                if (rand <= 0) {
+                    if (!stats[players[i].id]) stats[players[i].id] = { goals: 0, assists: 0, yellowCard: false, redCard: false, redCardType: null, minutesPlayed: 90, rating: 7, teamName };
+                    stats[players[i].id].goals = (stats[players[i].id].goals || 0) + 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    distributeAssists(players, goalCount, stats, side, teamName) {
+        if (goalCount === 0 || players.length === 0) return;
+        const assistCount = Math.max(0, goalCount - Math.floor(Math.random() * 2)); // Bazen gol asistssiz olur
+        const weights = players.map(p => {
+            let w = 1;
+            if (p.position === 'Ofansif Orta Saha' || p.position === 'Forvet Arkası') w = 4;
+            else if (p.position === 'Sol Kanat' || p.position === 'Sağ Kanat') w = 3;
+            else if (p.position === 'Merkez Orta Saha') w = 2;
+            else if (p.position === 'Santrafor') w = 1.5;
+            else if (p.position === 'Kaleci') w = 0.05;
+            return w;
+        });
+        const totalW = weights.reduce((a, b) => a + b, 0);
+        for (let a = 0; a < assistCount; a++) {
+            let rand = Math.random() * totalW;
+            for (let i = 0; i < players.length; i++) {
+                rand -= weights[i];
+                if (rand <= 0) {
+                    if (!stats[players[i].id]) stats[players[i].id] = { goals: 0, assists: 0, yellowCard: false, redCard: false, redCardType: null, minutesPlayed: 90, rating: 7, teamName };
+                    stats[players[i].id].assists = (stats[players[i].id].assists || 0) + 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    processCardsAndSuspensions(homeTeamName, awayTeamName, playerStats, matchStats) {
+        // matchStats.yellowCards.home / .away → maç genelindeki sarı kart sayısı
+        const homeYellows = matchStats?.yellowCards?.home || 0;
+        const awayYellows = matchStats?.yellowCards?.away || 0;
+
+        const applyCards = (teamName, yellowQuota) => {
+            const teamIdx = this.teams.findIndex(t => t.name === teamName);
+            if (teamIdx === -1) return;
+            const players = this.teams[teamIdx].players || [];
+            const teamPlayerIds = Object.keys(playerStats)
+                .filter(id => playerStats[id]?.teamName === teamName && playerStats[id]?.minutesPlayed > 0);
+
+            if (teamPlayerIds.length === 0) return;
+
+            // Sarı kart alan oyuncuları belirle (yellowQuota adedince)
+            const shuffled = [...teamPlayerIds].sort(() => Math.random() - 0.5);
+            const yellowReceivers = shuffled.slice(0, Math.min(yellowQuota, teamPlayerIds.length));
+
+            yellowReceivers.forEach(pid => {
+                playerStats[pid].yellowCard = true;
+                const pIdx = players.findIndex(p => String(p.id) === String(pid));
+                if (pIdx !== -1) {
+                    players[pIdx].yellowCards = (players[pIdx].yellowCards || 0) + 1;
+                    if (!players[pIdx].cardsHistory) players[pIdx].cardsHistory = [];
+                    players[pIdx].cardsHistory.push({ type: 'yellow', season: this.currentSeason });
+                    // 5 sarı = 1 maç ceza (daha gerçekçi)
+                    if (players[pIdx].yellowCards % 5 === 0) {
+                        players[pIdx].suspendedMatches = (players[pIdx].suspendedMatches || 0) + 1;
+                    }
+                }
+            });
+
+            // İkinci sarıdan kırmızı (%5 ihtimal, sadece yellow alan birinde)
+            if (yellowReceivers.length > 0 && Math.random() < 0.05) {
+                const targetPid = yellowReceivers[Math.floor(Math.random() * yellowReceivers.length)];
+                if (targetPid && !playerStats[targetPid]?.redCard) {
+                    playerStats[targetPid].redCard = true;
+                    playerStats[targetPid].redCardType = 'second-yellow';
+                    const pIdx = players.findIndex(p => String(p.id) === String(targetPid));
+                    if (pIdx !== -1) {
+                        players[pIdx].redCards = (players[pIdx].redCards || 0) + 1;
+                        players[pIdx].suspendedMatches = (players[pIdx].suspendedMatches || 0) + 1;
+                    }
+                }
+            }
+
+            // Direkt kırmızı kart (%3)
+            if (Math.random() < 0.03) {
+                const notYellow = teamPlayerIds.filter(id => !yellowReceivers.includes(id));
+                const directRedTarget = notYellow[Math.floor(Math.random() * notYellow.length)];
+                if (directRedTarget && !playerStats[directRedTarget]?.redCard) {
+                    if (!playerStats[directRedTarget]) playerStats[directRedTarget] = { goals: 0, assists: 0, yellowCard: false, redCard: false, minutesPlayed: 90, rating: 7, teamName };
+                    playerStats[directRedTarget].redCard = true;
+                    playerStats[directRedTarget].redCardType = 'direct';
+                    const pIdx = players.findIndex(p => String(p.id) === String(directRedTarget));
+                    if (pIdx !== -1) {
+                        players[pIdx].redCards = (players[pIdx].redCards || 0) + 1;
+                        players[pIdx].suspendedMatches = (players[pIdx].suspendedMatches || 0) + 2;
+                    }
+                }
+            }
+            this.teams[teamIdx].players = players;
+        };
+
+        applyCards(homeTeamName, homeYellows);
+        applyCards(awayTeamName, awayYellows);
+    }
+
+    decreaseSuspensions(teamName) {
+        const teamIdx = this.teams.findIndex(t => t.name === teamName);
+        if (teamIdx === -1) return;
+        const players = this.teams[teamIdx].players || [];
+        players.forEach(p => {
+            if ((p.suspendedMatches || 0) > 0) {
+                p.suspendedMatches--;
+            }
+        });
+    }
+
+    // Maça özel oyuncu istatistikleri (maç ekranından tıklanınca)
+    showMatchPlayerStats(playerId, teamName, matchId) {
+        const match = this.matches.find(m => m.id === matchId);
+        if (!match) return;
+        const teamIdx = this.teams.findIndex(t => t.name === teamName);
+        if (teamIdx === -1) return;
+        const player = (this.teams[teamIdx].players || []).find(p => String(p.id) === String(playerId));
+        if (!player) return;
+
+        const ps = (match.playerStats || {})[playerId];
+        if (!ps) { alert('Bu maça ait istatistik bulunamadı.'); return; }
+
+        const statKeys = this.getPositionStats(player.position);
+        const isHome = match.homeTeam === teamName;
+        const scored = isHome ? match.homeGoals : match.awayGoals;
+        const conceded = isHome ? match.awayGoals : match.homeGoals;
+        const resText = scored > conceded ? '✅ Galibiyet' : scored === conceded ? '🟡 Beraberlik' : '❌ Mağlubiyet';
+
+        const statRowsHtml = statKeys.map(key => {
+            let val;
+            if (key === 'yellowCard') val = ps.yellowCard ? '🟨 Sarı Kart Aldı' : 'Almadı';
+            else if (key === 'redCard') val = ps.redCard ? (ps.redCardType === 'direct' ? '🟥 Direkt Kırmızı' : '🟨🟥 2. Sarıdan Kırmızı') : 'Almadı';
+            else if (key === 'cleanSheet') val = ps.cleanSheet ? '✅ Gol Yemedi' : '❌ Gol Yedi';
+            else if (key === 'minutesPlayed') val = `${ps.minutesPlayed || 0}'${ps.subOn ? ' (Girdi)' : ps.subOff ? ' (Çıktı)' : ''}`;
+            else if (key === 'rating') val = `${ps.rating || '-'} / 10`;
+            else val = ps[key] !== undefined ? ps[key] : '-';
+
+            return `<div class="mps-stat-row">
+                <span class="mps-stat-label">${this.getStatLabel(key)}</span>
+                <span class="mps-stat-val">${val}</span>
+            </div>`;
+        }).join('');
+
+        const subInfo = ps.subOn
+            ? `<div class="mps-sub-info">⬆️ <strong>${ps.subMinute}'</strong> dk'da <em>${ps.subPlayer || '?'}</em> yerine girdi</div>`
+            : ps.subOff
+            ? `<div class="mps-sub-info">⬇️ <strong>${ps.subMinute}'</strong> dk'da <em>${ps.subPlayer || '?'}</em> yerine çıktı</div>`
+            : '';
+
+        const html = `
+        <h3 style="margin:0 0 .5rem;font-size:1.1rem">
+            <span style="color:#667eea">#${player.number || '?'}</span> ${player.name}
+            <span style="font-size:.8rem;color:#888;font-weight:400;margin-left:.5rem">${player.position || ''}</span>
+        </h3>
+        <div style="color:#888;font-size:.85rem;margin-bottom:.75rem">${match.homeTeam} vs ${match.awayTeam} — ${match.season} H${match.week || '?'} — ${resText}</div>
+        ${subInfo}
+        <div class="mps-stats-grid">
+            ${statRowsHtml}
+        </div>
+        <div style="margin-top:1rem;border-top:1px solid #eee;padding-top:.75rem">
+            <button class="btn btn-sm btn-secondary" onclick="window.footballSim.showPlayerProfile('${playerId}', '${teamName.replace(/'/g,"\\'")}')">
+                📊 Genel Sezon İstatistikleri
+            </button>
+        </div>`;
+
+        document.getElementById('match-player-stats-content').innerHTML = html;
+        document.getElementById('match-player-stats-modal').classList.add('show');
+    }
+
+    // Oyuncu profili göster (genel istatistikler - normal kadro görünümünden)
+    showPlayerProfile(playerId, teamName) {
+        const teamIdx = this.teams.findIndex(t => t.name === teamName);
+        if (teamIdx === -1) return;
+        const player = (this.teams[teamIdx].players || []).find(p => String(p.id) === String(playerId));
+        if (!player) return;
+
+        // Bu oyuncunun oynadığı tüm maçları bul
+        const playerMatches = this.matches.filter(m =>
+            (m.homeTeam === teamName || m.awayTeam === teamName) &&
+            m.playerStats && m.playerStats[playerId]
+        );
+
+        const playedMatches = playerMatches.filter(m => (m.playerStats[playerId]?.minutesPlayed || 0) > 0);
+        const totalGoals = playedMatches.reduce((sum, m) => sum + (m.playerStats[playerId]?.goals || 0), 0);
+        const totalAssists = playedMatches.reduce((sum, m) => sum + (m.playerStats[playerId]?.assists || 0), 0);
+        const totalMinutes = playedMatches.reduce((sum, m) => sum + (m.playerStats[playerId]?.minutesPlayed || 0), 0);
+        const totalYellows = (player.cardsHistory || []).filter(c => c.type === 'yellow').length;
+        const totalReds = player.redCards || 0;
+        const avgRating = playedMatches.length > 0
+            ? (playedMatches.reduce((sum, m) => sum + (m.playerStats[playerId]?.rating || 0), 0) / playedMatches.length).toFixed(1)
+            : '-';
+        const matchesPlayed = playedMatches.length;
+
+        // Mevkiye özel kümülatif istatistikler
+        const posStatKeys = this.getPositionStats(player.position).filter(k => !['minutesPlayed','goals','assists','yellowCard','redCard','rating'].includes(k));
+        const cumStats = {};
+        posStatKeys.forEach(key => {
+            cumStats[key] = playedMatches.reduce((sum, m) => {
+                const val = m.playerStats[playerId]?.[key];
+                if (typeof val === 'boolean') return sum + (val ? 1 : 0);
+                return sum + (val || 0);
+            }, 0);
+        });
+
+        const posStatsHtml = posStatKeys.length > 0 ? `
+        <div class="pp-pos-stats">
+            <div class="pp-section-title">Mevki İstatistikleri (${player.position})</div>
+            <div class="pp-pos-stats-grid">
+                ${posStatKeys.map(key => `
+                    <div class="pp-pos-stat">
+                        <div class="pp-pos-num">${cumStats[key]}</div>
+                        <div class="pp-pos-lbl">${this.getStatLabel(key)}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>` : '';
+
+        const roleLabelMap = {};
+        this.getPlayerRoles().forEach(r => roleLabelMap[r.id] = r.label);
+
+        const matchHistoryHTML = playedMatches.slice(-8).reverse().map(m => {
+            const isHome = m.homeTeam === teamName;
+            const opp = isHome ? m.awayTeam : m.homeTeam;
+            const ms = m.playerStats[playerId] || {};
+            const scored = isHome ? m.homeGoals : m.awayGoals;
+            const conceded = isHome ? m.awayGoals : m.homeGoals;
+            const resText = scored > conceded ? 'G' : scored === conceded ? 'B' : 'M';
+            const resCls = scored > conceded ? 'form-w' : scored === conceded ? 'form-d' : 'form-l';
+            const clickFn = m.id ? `onclick="window.footballSim.showMatchPlayerStats('${playerId}', '${teamName.replace(/'/g,"\\'")}', '${m.id}')"` : '';
+            return `<div class="pp-match-row" ${clickFn} style="${m.id ? 'cursor:pointer' : ''}">
+                <span class="form-badge ${resCls}">${resText}</span>
+                <span class="pp-opp">${opp}</span>
+                <span class="pp-score">${scored}-${conceded}</span>
+                <span class="pp-mins">${ms.minutesPlayed || 0}'</span>
+                <span class="pp-goals">${ms.goals > 0 ? '⚽ '+ms.goals : ''}</span>
+                <span class="pp-assists">${ms.assists > 0 ? '🎯 '+ms.assists : ''}</span>
+                ${ms.yellowCard ? '<span class="pp-card pp-yellow">🟨</span>' : ''}
+                ${ms.redCard ? '<span class="pp-card pp-red">🟥</span>' : ''}
+                <span class="pp-rating" style="color:${ms.rating >= 8 ? '#22c55e' : ms.rating >= 6.5 ? '#667eea' : '#ef4444'};font-weight:700">${ms.rating || '-'}</span>
+            </div>`;
+        }).join('') || '<p class="no-data">Henüz maç istatistiği yok.</p>';
+
+        const html = `
+        <div class="player-profile">
+            <div class="pp-header">
+                <div class="pp-number">${player.number || '?'}</div>
+                <div class="pp-info">
+                    <h2>${player.name}</h2>
+                    <div class="pp-meta">
+                        <span class="pp-position-badge">${player.position || '-'}</span>
+                        <span class="pp-role-badge">${roleLabelMap[player.role] || player.role || '-'}</span>
+                    </div>
+                    <div class="pp-team">${teamName}</div>
+                </div>
+                <div class="pp-rating-big">
+                    <div class="pp-rating-num">${player.rating}</div>
+                    <div class="pp-rating-lbl">Puan (1-100)</div>
+                </div>
+            </div>
+            <div class="pp-stats-grid">
+                <div class="pp-stat"><div class="pp-stat-num">${matchesPlayed}</div><div class="pp-stat-lbl">Maç</div></div>
+                <div class="pp-stat"><div class="pp-stat-num">${totalGoals}</div><div class="pp-stat-lbl">Gol</div></div>
+                <div class="pp-stat"><div class="pp-stat-num">${totalAssists}</div><div class="pp-stat-lbl">Asist</div></div>
+                <div class="pp-stat"><div class="pp-stat-num">${totalMinutes}'</div><div class="pp-stat-lbl">Dakika</div></div>
+                <div class="pp-stat"><div class="pp-stat-num" style="color:#f59e0b">${totalYellows}</div><div class="pp-stat-lbl">Sarı Kart</div></div>
+                <div class="pp-stat"><div class="pp-stat-num" style="color:#ef4444">${totalReds}</div><div class="pp-stat-lbl">Kırmızı</div></div>
+                <div class="pp-stat"><div class="pp-stat-num" style="color:#667eea">${avgRating}</div><div class="pp-stat-lbl">Ort. Puan</div></div>
+                <div class="pp-stat"><div class="pp-stat-num" style="color:${(player.suspendedMatches||0) > 0 ? '#ef4444' : '#22c55e'}">${(player.suspendedMatches||0) > 0 ? player.suspendedMatches+' maç' : '✓'}</div><div class="pp-stat-lbl">Ceza</div></div>
+            </div>
+            ${posStatsHtml}
+            <div class="pp-matches-section">
+                <div class="pp-section-title">Son Maçlar <small style="color:#aaa;font-weight:400">(Detay için tıkla)</small></div>
+                ${matchHistoryHTML}
+            </div>
+        </div>`;
+
+        // Mevcut modal içeriğini player profile ile değiştir
+        const modal = document.getElementById('player-profile-modal');
+        document.getElementById('player-profile-content').innerHTML = html;
+        modal.classList.add('show');
+    }
+
+    // Takım profili içinde kadro göster
+    renderSquadForProfile(teamName) {
+        const players = this.getTeamPlayers(teamName);
+        if (players.length === 0) {
+            return `<div class="squad-empty">
+                <p>Bu takımda henüz oyuncu yok.</p>
+                <button class="btn btn-primary btn-sm" onclick="window.footballSim.showAddPlayerModal('${teamName.replace(/'/g,"\\'")}')">
+                    <i class="fas fa-plus"></i> Oyuncu Ekle
+                </button>
+            </div>`;
+        }
+
+        const byPosition = {};
+        players.forEach(p => {
+            const pos = p.position || 'Diğer';
+            if (!byPosition[pos]) byPosition[pos] = [];
+            byPosition[pos].push(p);
+        });
+
+        const roleLabelMap = {};
+        this.getPlayerRoles().forEach(r => roleLabelMap[r.id] = r.label);
+
+        const posOrder = ['Kaleci','Stoper','Sol Bek','Sağ Bek','Ön Libero','Merkez Orta Saha','Ofansif Orta Saha','Forvet Arkası','Sol Kanat','Sağ Kanat','Santrafor'];
+        let html = `<div class="squad-container">
+            <div class="squad-header-row">
+                <button class="btn btn-sm btn-primary" onclick="window.footballSim.showAddPlayerModal('${teamName.replace(/'/g,"\\'")}')">
+                    <i class="fas fa-plus"></i> Oyuncu Ekle
+                </button>
+                <span style="color:#888;font-size:.8rem">${players.length} oyuncu</span>
+            </div>`;
+
+        posOrder.forEach(pos => {
+            const group = byPosition[pos];
+            if (!group) return;
+            html += `<div class="squad-position-group">
+                <div class="squad-position-label">${pos}</div>`;
+            group.forEach(p => {
+                const suspended = (p.suspendedMatches || 0) > 0;
+                html += `<div class="squad-player-row ${suspended ? 'suspended' : ''}" onclick="window.footballSim.showPlayerProfile('${p.id}', '${teamName.replace(/'/g,"\\'")}')">
+                    <span class="squad-num">${p.number || '?'}</span>
+                    <span class="squad-name">${p.name}</span>
+                    <span class="squad-role" title="${roleLabelMap[p.role] || ''}">${p.role === 'ilk11' ? '⭐' : p.role === 'rotasyon' ? '🔄' : p.role === 'yedek' ? '🪑' : p.role === 'kararliYedek' ? '↕' : '🌱'}</span>
+                    <span class="squad-rating">${p.rating}</span>
+                    ${suspended ? `<span class="squad-suspended" title="${p.suspendedMatches} maç cezalı">🚫${p.suspendedMatches}</span>` : ''}
+                    <button class="btn-edit-player" title="Düzenle" onclick="event.stopPropagation(); window.footballSim.showEditPlayerModal('${teamName.replace(/'/g,"\\'")}', '${p.id}')">✏️</button>
+                    <button class="btn-remove-player" onclick="event.stopPropagation(); window.footballSim.removePlayerConfirm('${teamName.replace(/'/g,"\\'")}', '${p.id}')">✕</button>
+                </div>`;
+            });
+            html += '</div>';
+        });
+
+        html += '</div>';
+        return html;
+    }
+
+    removePlayerConfirm(teamName, playerId) {
+        if (confirm('Bu oyuncuyu kadrodan çıkarmak istiyor musunuz?')) {
+            this.removePlayerFromTeam(teamName, playerId);
+            // Profil modalını yenile
+            this.showTeamProfile(teamName);
+        }
+    }
+
+    showAddPlayerModal(teamName) {
+        const positions = this.getPositions();
+        const roles = this.getPlayerRoles();
+        const modalHtml = `
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('add-player-modal').classList.remove('show')">&times;</span>
+            <h3><i class="fas fa-user-plus"></i> Oyuncu Ekle - ${teamName}</h3>
+            <form id="add-player-form" onsubmit="event.preventDefault(); window.footballSim.submitAddPlayer('${teamName.replace(/'/g,"\\'")}')">
+                <div class="form-group">
+                    <label>Forma Numarası:</label>
+                    <input type="number" id="player-number" min="1" max="99" required placeholder="Örn: 9">
+                </div>
+                <div class="form-group">
+                    <label>Oyuncu Adı:</label>
+                    <input type="text" id="player-name" required placeholder="Oyuncu adı">
+                </div>
+                <div class="form-group">
+                    <label>Mevki:</label>
+                    <select id="player-position" required>
+                        <option value="">Mevki Seçin</option>
+                        ${positions.map(p => `<option value="${p}">${p}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Oyuncu Reytingi (1-100):</label>
+                    <input type="number" id="player-rating" min="1" max="100" required placeholder="Örn: 82">
+                </div>
+                <div class="form-group">
+                    <label>Oyuncu Tipi:</label>
+                    <select id="player-role" required>
+                        <option value="">Tip Seçin</option>
+                        ${roles.map(r => `<option value="${r.id}">${r.label}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('add-player-modal').classList.remove('show')">İptal</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Kaydet</button>
+                </div>
+            </form>
+        </div>`;
+        document.getElementById('add-player-modal').innerHTML = modalHtml;
+        document.getElementById('add-player-modal').classList.add('show');
+    }
+
+    submitAddPlayer(teamName) {
+        const number = parseInt(document.getElementById('player-number').value);
+        const name = document.getElementById('player-name').value.trim();
+        const position = document.getElementById('player-position').value;
+        const rating = parseInt(document.getElementById('player-rating').value);
+        const role = document.getElementById('player-role').value;
+
+        if (!name || !position || !role || isNaN(number) || isNaN(rating)) {
+            alert('Lütfen tüm alanları doldurun.'); return;
+        }
+        if (rating < 1 || rating > 100) {
+            alert('Reyting 1-100 arasında olmalıdır.'); return;
+        }
+
+        this.addPlayerToTeam(teamName, { number, name, position, rating, role });
+        document.getElementById('add-player-modal').classList.remove('show');
+        this.showTeamProfile(teamName); // Profili yenile
+        this.addActivity(`${teamName} kadrosuna ${name} eklendi`);
+    }
+
+    showEditPlayerModal(teamName, playerId) {
+        const teamIdx = this.teams.findIndex(t => t.name === teamName);
+        if (teamIdx === -1) return;
+        const player = (this.teams[teamIdx].players || []).find(p => String(p.id) === String(playerId));
+        if (!player) return;
+
+        const positions = this.getPositions();
+        const roles = this.getPlayerRoles();
+
+        const modalHtml = `
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('edit-player-modal').classList.remove('show')">&times;</span>
+            <h3><i class="fas fa-user-edit"></i> Oyuncu Düzenle - ${player.name}</h3>
+            <form id="edit-player-form" onsubmit="event.preventDefault(); window.footballSim.submitEditPlayer('${teamName.replace(/'/g,"\\'")}', '${String(playerId).replace(/'/g,"\\'")}')">
+                <div class="form-group">
+                    <label>Forma Numarası:</label>
+                    <input type="number" id="edit-player-number" min="1" max="99" required value="${player.number || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Oyuncu Adı:</label>
+                    <input type="text" id="edit-player-name" required value="${player.name || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Mevki:</label>
+                    <select id="edit-player-position" required>
+                        <option value="">Mevki Seçin</option>
+                        ${positions.map(p => `<option value="${p}" ${p === player.position ? 'selected' : ''}>${p}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Oyuncu Reytingi (1-100):</label>
+                    <input type="number" id="edit-player-rating" min="1" max="100" required value="${player.rating || 75}">
+                </div>
+                <div class="form-group">
+                    <label>Oyuncu Tipi:</label>
+                    <select id="edit-player-role" required>
+                        <option value="">Tip Seçin</option>
+                        ${roles.map(r => `<option value="${r.id}" ${r.id === player.role ? 'selected' : ''}>${r.label}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-player-modal').classList.remove('show')">İptal</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Kaydet</button>
+                </div>
+            </form>
+        </div>`;
+        document.getElementById('edit-player-modal').innerHTML = modalHtml;
+        document.getElementById('edit-player-modal').classList.add('show');
+    }
+
+    submitEditPlayer(teamName, playerId) {
+        const number = parseInt(document.getElementById('edit-player-number').value);
+        const name = document.getElementById('edit-player-name').value.trim();
+        const position = document.getElementById('edit-player-position').value;
+        const rating = parseInt(document.getElementById('edit-player-rating').value);
+        const role = document.getElementById('edit-player-role').value;
+
+        if (!name || !position || !role || isNaN(number) || isNaN(rating)) {
+            alert('Lütfen tüm alanları doldurun.'); return;
+        }
+        if (rating < 1 || rating > 100) {
+            alert('Reyting 1-100 arasında olmalıdır.'); return;
+        }
+
+        const teamIdx = this.teams.findIndex(t => t.name === teamName);
+        if (teamIdx === -1) { alert('Takım bulunamadı.'); return; }
+        const playerIdx = (this.teams[teamIdx].players || []).findIndex(p => String(p.id) === String(playerId));
+        if (playerIdx === -1) { alert('Oyuncu bulunamadı.'); return; }
+
+        const oldPlayer = this.teams[teamIdx].players[playerIdx];
+        this.teams[teamIdx].players[playerIdx] = { ...oldPlayer, number, name, position, rating, role };
+        this.saveData();
+        document.getElementById('edit-player-modal').classList.remove('show');
+        this.showTeamProfile(teamName);
+        this.addActivity(`${teamName} - ${name} oyuncu bilgileri güncellendi`);
+    }
+
+    // Maç detaylarını göster
+    showMatchDetailsEnhanced(matchId) {
+        const match = this.matches.find(m => m.id === matchId);
+        if (!match) return;
+
+        const homeSquad = match.homeSquad || { starting: [], bench: [] };
+        const awaySquad = match.awaySquad || { starting: [], bench: [] };
+        const stats = match.stats || {};
+        const playerStats = match.playerStats || {};
+
+        const renderSquadList = (players, teamName, title) => {
+            if (!players || players.length === 0) return `<div class="no-data">Kadro bilgisi yok</div>`;
+            return players.map(p => {
+                const ps = playerStats[p.id] || {};
+                const suspended = (p.suspendedMatches || 0) > 0;
+                const notPlayed = ps.minutesPlayed === 0;
+                const subInfo = ps.subOn ? `↑${ps.subMinute}'` : ps.subOff ? `↓${ps.subMinute}'` : '';
+                return `<div class="md-player-row ${notPlayed ? 'md-player-bench' : ''}" onclick="window.footballSim.showMatchPlayerStats('${p.id}', '${teamName.replace(/'/g,"\\'")}', '${matchId}')">
+                    <span class="md-num">${p.number || '?'}</span>
+                    <span class="md-name">${p.name}</span>
+                    <span class="md-pos">${p.position || ''}</span>
+                    <span class="md-mins" title="Oynanan dakika">${ps.minutesPlayed > 0 ? ps.minutesPlayed + "'" : (notPlayed ? 'Oynamadı' : '-')} ${subInfo ? `<small style="color:#888">${subInfo}</small>` : ''}</span>
+                    ${ps.goals > 0 ? `<span class="md-event">⚽${ps.goals}</span>` : ''}
+                    ${ps.assists > 0 ? `<span class="md-event">🎯${ps.assists}</span>` : ''}
+                    ${ps.yellowCard ? '<span class="md-event">🟨</span>' : ''}
+                    ${ps.redCard ? `<span class="md-event">${ps.redCardType === 'direct' ? '🟥' : '🟨🟥'}</span>` : ''}
+                    <span class="md-rating" style="${ps.rating >= 8 ? 'color:#22c55e' : ps.rating >= 6.5 ? 'color:#667eea' : 'color:#ef4444'}">${ps.minutesPlayed > 0 && ps.rating ? ps.rating : '-'}</span>
+                </div>`;
+            }).join('');
+        };
+
+        const renderEvents = (events) => {
+            if (!events || events.length === 0) return '<p class="no-data">Olay kaydı yok.</p>';
+            return events.map(e => {
+                let icon = '';
+                let text = '';
+                if (e.type === 'goal') {
+                    icon = '⚽';
+                    text = `<strong>${e.player || '?'}</strong>${e.assist ? ` <span style="color:#888;font-size:.85em">(Asist: ${e.assist})</span>` : ''}${e.isPenalty ? ' <span class="md-event-badge">P</span>' : ''}`;
+                }
+                else if (e.type === 'yellow') { icon = '🟨'; text = `<strong>${e.player || '?'}</strong> <span style="color:#888;font-size:.85em">Sarı kart</span>`; }
+                else if (e.type === 'red') {
+                    icon = e.direct ? '🟥' : '🟨🟥';
+                    text = `<strong>${e.player || '?'}</strong> <span style="color:#888;font-size:.85em">${e.direct ? 'Direkt kırmızı' : 'İkinci sarıdan kırmızı'}</span>`;
+                }
+                else if (e.type === 'sub') {
+                    icon = '🔄';
+                    text = e.playerOut
+                        ? `<span style="color:#ef4444">↓ ${e.playerOut}</span> <span style="color:#22c55e">↑ ${e.playerIn || '?'}</span>`
+                        : 'Değişiklik';
+                }
+                return `<div class="md-event-row">
+                    <span class="md-event-min">${e.min}'</span>
+                    <span class="md-event-icon">${icon}</span>
+                    <span class="md-event-text">${text}</span>
+                    <span class="md-event-team">${e.team === 'home' ? match.homeTeam : match.awayTeam}</span>
+                </div>`;
+            }).join('');
+        };
+
+        const statBar = (label, home, away) => `
+            <div class="stat-bar-row">
+                <span class="stat-val">${home}</span>
+                <div class="stat-bar-wrap">
+                    <div class="stat-bar-home" style="width:${home/(home+away+0.01)*100}%"></div>
+                    <div class="stat-bar-away" style="width:${away/(home+away+0.01)*100}%"></div>
+                </div>
+                <span class="stat-val">${away}</span>
+                <span class="stat-label">${label}</span>
+            </div>`;
+
+        const html = `
+        <div class="match-detail-full">
+            <div class="md-scoreboard">
+                <div class="md-team">${match.homeTeam}</div>
+                <div class="md-score-big">${match.homeGoals} - ${match.awayGoals}</div>
+                <div class="md-team">${match.awayTeam}</div>
+            </div>
+            <div class="md-meta">${match.league} · Hafta ${match.week || '?'} · ${match.season}</div>
+
+            <div class="md-tabs">
+                <button class="md-tab active" onclick="this.closest('.md-tabs').querySelectorAll('.md-tab').forEach(t=>t.classList.remove('active')); this.classList.add('active'); this.closest('.match-detail-full').querySelectorAll('.md-panel').forEach(p=>p.classList.remove('active')); this.closest('.match-detail-full').querySelector('#md-panel-stats').classList.add('active')">İstatistikler</button>
+                <button class="md-tab" onclick="this.closest('.md-tabs').querySelectorAll('.md-tab').forEach(t=>t.classList.remove('active')); this.classList.add('active'); this.closest('.match-detail-full').querySelectorAll('.md-panel').forEach(p=>p.classList.remove('active')); this.closest('.match-detail-full').querySelector('#md-panel-squads').classList.add('active')">Kadrolar</button>
+                <button class="md-tab" onclick="this.closest('.md-tabs').querySelectorAll('.md-tab').forEach(t=>t.classList.remove('active')); this.classList.add('active'); this.closest('.match-detail-full').querySelectorAll('.md-panel').forEach(p=>p.classList.remove('active')); this.closest('.match-detail-full').querySelector('#md-panel-events').classList.add('active')">Olaylar</button>
+            </div>
+
+            <div id="md-panel-stats" class="md-panel active">
+                <div class="md-stats-container">
+                    ${stats.possession ? statBar('Topla Oynama %', stats.possession.home, stats.possession.away) : ''}
+                    ${stats.shots ? statBar('Şut', stats.shots.home, stats.shots.away) : ''}
+                    ${stats.shotsOnTarget ? statBar('İsabetli Şut', stats.shotsOnTarget.home, stats.shotsOnTarget.away) : ''}
+                    ${stats.corners ? statBar('Korner', stats.corners.home, stats.corners.away) : ''}
+                    ${stats.fouls ? statBar('Faul', stats.fouls.home, stats.fouls.away) : ''}
+                    ${stats.offsides ? statBar('Ofsayt', stats.offsides.home, stats.offsides.away) : ''}
+                    ${stats.yellowCards ? statBar('Sarı Kart', stats.yellowCards.home, stats.yellowCards.away) : ''}
+                </div>
+            </div>
+
+            <div id="md-panel-squads" class="md-panel">
+                <div class="md-squads-layout">
+                    <div class="md-squad-col">
+                        <h4>${match.homeTeam} - İlk 11</h4>
+                        ${renderSquadList(homeSquad.starting, match.homeTeam, 'home')}
+                        <h4 style="margin-top:1rem">Yedekler</h4>
+                        ${renderSquadList(homeSquad.bench, match.homeTeam, 'home')}
+                    </div>
+                    <div class="md-squad-col">
+                        <h4>${match.awayTeam} - İlk 11</h4>
+                        ${renderSquadList(awaySquad.starting, match.awayTeam, 'away')}
+                        <h4 style="margin-top:1rem">Yedekler</h4>
+                        ${renderSquadList(awaySquad.bench, match.awayTeam, 'away')}
+                    </div>
+                </div>
+            </div>
+
+            <div id="md-panel-events" class="md-panel">
+                <div class="md-events-list">
+                    ${renderEvents(match.events)}
+                </div>
+            </div>
+        </div>`;
+
+        document.getElementById('match-details-content').innerHTML = html;
+        document.getElementById('match-details-modal').classList.add('show');
+    }
+
+    // Match Simulation Engine (0.5-9.9 reyting)
 
     generateGoals(attackRating, defenseRating, isWinner) {
         const attackStrength = Math.max(0.5, Math.min(9.9, attackRating));
@@ -1248,8 +2380,8 @@ class FootballSimulation {
         }
 
         teamsList.innerHTML = filteredTeams.map(team => `
-            <div class="team-card">
-                <div class="team-actions">
+            <div class="team-card" onclick="showTeamProfile('${team.name.replace(/'/g, "\\'")}')" style="cursor:pointer">
+                <div class="team-actions" onclick="event.stopPropagation()">
                     <button class="btn btn-sm btn-secondary" onclick="editTeam(${team.id})">
                         <i class="fas fa-edit"></i>
                     </button>
@@ -1279,6 +2411,31 @@ class FootballSimulation {
         const europeanSpots = this.getEuropeanSpots(leagueRanking);
         const availableSeasons = this.getAvailableSeasons();
 
+        // Build week data
+        const byWeekAll = {};
+        leagueMatches.forEach(m => { const w = m.week || 1; if (!byWeekAll[w]) byWeekAll[w] = []; byWeekAll[w].push(m); });
+        const allWeeks = Object.keys(byWeekAll).map(Number).sort((a,b)=>a-b);
+        const lastPlayedWeek = allWeeks.length > 0 ? allWeeks[allWeeks.length - 1] : null;
+
+        const standingsRows = standings.map((team, index) => {
+            const position = index + 1;
+            let rowClass = this.getPositionClass(position, leagueName, europeanSpots);
+            return `<tr class="${rowClass}" onclick="showTeamProfile('${team.name.replace(/'/g, "\\'")}')" style="cursor:pointer">
+                <td>${position}</td>
+                <td><strong>${team.name}</strong></td>
+                <td>${team.played}</td>
+                <td>${team.won}</td>
+                <td>${team.drawn}</td>
+                <td>${team.lost}</td>
+                <td>${team.goalsFor}</td>
+                <td>${team.goalsAgainst}</td>
+                <td>${team.goalsFor - team.goalsAgainst}</td>
+                <td><strong>${team.points}</strong></td>
+            </tr>`;
+        }).join('');
+
+        const weekBtns = allWeeks.map(w => `<button class="week-btn ${w === lastPlayedWeek ? 'active' : ''}" onclick="window.footballSim.showWeekFixtures(${w}, this)">${w}. Hafta</button>`).join('');
+
         const tableContainer = document.getElementById('league-table');
         tableContainer.innerHTML = `
             <h3>${leagueName} - ${viewSeason}</h3>
@@ -1293,78 +2450,71 @@ class FootballSimulation {
                 </button>
                 ` : ''}
             </div>
-            <div class="table-responsive">
-                <table class="league-table">
-                    <thead>
-                        <tr>
-                            <th>Pos</th>
-                            <th>Takım</th>
-                            <th>O</th>
-                            <th>G</th>
-                            <th>B</th>
-                            <th>M</th>
-                            <th>A</th>
-                            <th>Y</th>
-                            <th>AV</th>
-                            <th>P</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${standings.map((team, index) => {
-                            const position = index + 1;
-                            let rowClass = this.getPositionClass(position, leagueName, europeanSpots);
-                            
-                            return `
-                                <tr class="${rowClass}">
-                                    <td>${position}</td>
-                                    <td><strong>${team.name}</strong></td>
-                                    <td>${team.played}</td>
-                                    <td>${team.won}</td>
-                                    <td>${team.drawn}</td>
-                                    <td>${team.lost}</td>
-                                    <td>${team.goalsFor}</td>
-                                    <td>${team.goalsAgainst}</td>
-                                    <td>${team.goalsFor - team.goalsAgainst}</td>
-                                    <td><strong>${team.points}</strong></td>
+            <div class="league-content-layout">
+                <div class="league-table-col">
+                    <div class="table-responsive">
+                        <table class="league-table">
+                            <thead>
+                                <tr>
+                                    <th>Pos</th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>A</th><th>Y</th><th>AV</th><th>P</th>
                                 </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-                <div class="legend">
-                    <div class="legend-item champion">Şampiyon (UCL)</div>
-                    <div class="legend-item uel-champion">Şampiyon (UEL)</div>
-                    <div class="legend-item ucl-qualification">Şampiyonlar Ligi</div>
-                    <div class="legend-item uel-qualification">Avrupa Ligi</div>
-                    <div class="legend-item uecl-qualification">Konferans Ligi</div>
-                    ${leagueName === 'Bundesliga' ? '<div class="legend-item playoff-zone">Playoff</div>' : ''}
-                    <div class="legend-item relegation-zone">Küme Düşme</div>
+                            </thead>
+                            <tbody>${standingsRows}</tbody>
+                        </table>
+                        <div class="legend">
+                            <div class="legend-item champion">Şampiyon (UCL)</div>
+                            <div class="legend-item uel-champion">Şampiyon (UEL)</div>
+                            <div class="legend-item ucl-qualification">Şampiyonlar Ligi</div>
+                            <div class="legend-item uel-qualification">Avrupa Ligi</div>
+                            <div class="legend-item uecl-qualification">Konferans Ligi</div>
+                            ${leagueName === 'Bundesliga' ? '<div class="legend-item playoff-zone">Playoff</div>' : ''}
+                            <div class="legend-item relegation-zone">Küme Düşme</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="league-fixtures-col">
+                    <h4>📅 Haftalık Maç Sonuçları</h4>
+                    <div class="fixtures-week-selector">
+                        ${weekBtns || '<span style="color:#888;font-size:.85rem">Henüz maç oynanmadı</span>'}
+                    </div>
+                    <div id="week-fixtures-display">
+                        ${lastPlayedWeek ? this.renderWeekFixtures(byWeekAll, lastPlayedWeek) : '<p class="no-data">Henüz maç oynanmadı.</p>'}
+                    </div>
                 </div>
             </div>
-            <div class="season-fixtures-section">
-                <h4>${viewSeason} Sezonu Maç Sonuçları</h4>
-                <div id="league-season-fixtures">${this.renderSeasonFixturesByWeek(leagueName, viewSeason, leagueMatches)}</div>
-            </div>
         `;
+        // Store byWeek data for week switching
+        this._currentLeagueByWeek = byWeekAll;
+    }
+    renderWeekFixtures(byWeek, week) {
+        const matches = byWeek[week] || [];
+        if (matches.length === 0) return '<p class="no-data">Bu haftaya ait maç yok.</p>';
+        return `<div class="week-results-block">
+            <div class="week-results-header"><strong>${week}. Hafta</strong></div>
+            <ul class="week-results-list">
+                ${matches.map(m => {
+                    const matchId = m.id || '';
+                    const clickFn = matchId ? `onclick="window.footballSim.showMatchDetailsEnhanced('${matchId}')" style="cursor:pointer"` : '';
+                    return `<li class="wrf-row ${matchId ? 'wrf-clickable' : ''}" ${clickFn}>
+                        <span class="wrf-home">${m.homeTeam}</span>
+                        <span class="wrf-score">${m.homeGoals} - ${m.awayGoals}</span>
+                        <span class="wrf-away">${m.awayTeam}</span>
+                        ${matchId ? '<span class="wrf-detail-hint">📋</span>' : ''}
+                    </li>`;
+                }).join('')}
+            </ul>
+        </div>`;
     }
 
-    renderSeasonFixturesByWeek(leagueName, season, leagueMatches) {
-        const byWeek = {};
-        leagueMatches.forEach(m => {
-            const w = m.week || 1;
-            if (!byWeek[w]) byWeek[w] = [];
-            byWeek[w].push(m);
-        });
-        const weeks = Object.keys(byWeek).map(Number).sort((a, b) => a - b);
-        if (weeks.length === 0) return '<p class="no-data">Bu sezona ait maç kaydı yok.</p>';
-        return weeks.map(week => `
-            <div class="week-results-block">
-                <strong>Hafta ${week}</strong>
-                <ul class="week-results-list">
-                    ${byWeek[week].map(m => `<li>${m.homeTeam} ${m.homeGoals} - ${m.awayGoals} ${m.awayTeam}</li>`).join('')}
-                </ul>
-            </div>
-        `).join('');
+    showWeekFixtures(week, btnEl) {
+        const byWeek = this._currentLeagueByWeek || {};
+        const display = document.getElementById('week-fixtures-display');
+        if (display) display.innerHTML = this.renderWeekFixtures(byWeek, week);
+        // Update active button
+        if (btnEl) {
+            btnEl.closest('.fixtures-week-selector').querySelectorAll('.week-btn').forEach(b => b.classList.remove('active'));
+            btnEl.classList.add('active');
+        }
     }
 
     getPositionClass(position, leagueName, europeanSpots) {
@@ -1510,7 +2660,7 @@ class FootballSimulation {
         }
 
         matchesContainer.innerHTML = recentMatches.map(match => `
-            <div class="match-card" onclick="showMatchDetails('${match.homeTeam}', '${match.awayTeam}', '${match.date}')">
+            <div class="match-card ${match.id ? 'match-card-clickable' : ''}" ${match.id ? `onclick="window.footballSim.showMatchDetailsEnhanced('${match.id}')"` : ''}>
                 <div class="match-header">${match.league} - Hafta ${match.week || 1}</div>
                 <div class="match-teams">
                     <div class="team">
@@ -1521,6 +2671,7 @@ class FootballSimulation {
                         <div class="team-name">${match.awayTeam}</div>
                     </div>
                 </div>
+                ${match.id ? '<div class="match-card-hint">Detaylar için tıkla</div>' : ''}
             </div>
         `).join('');
     }
@@ -1744,31 +2895,38 @@ class FootballSimulation {
 
         if (state.phase === 'playoff_draw') {
             const st = state.standingsOrder || [];
-            const pgDefs = [
-                { label: 'Eşleşme 1', highRange: '9-10',  lowRange: '23-24', high: st.slice(8,10),  low: st.slice(22,24) },
-                { label: 'Eşleşme 2', highRange: '11-12', lowRange: '21-22', high: st.slice(10,12), low: st.slice(20,22) },
-                { label: 'Eşleşme 3', highRange: '13-14', lowRange: '19-20', high: st.slice(12,14), low: st.slice(18,20) },
-                { label: 'Eşleşme 4', highRange: '15-16', lowRange: '17-18', high: st.slice(14,16), low: st.slice(16,18) },
-            ];
-            const drawn   = new Set(state.playoffPairs.flatMap(p => [p.team1, p.team2]));
+            // 4 havuz: her havuzda 2 üst + 2 alt takım → havuzdan 2 eşleşme çıkar
+            const poolDefs = [
+                { label: 'Havuz A (9-10 vs 23-24)', highRange: '9-10', lowRange: '23-24',
+                  high: [st[8], st[9]].filter(Boolean), low: [st[22], st[23]].filter(Boolean) },
+                { label: 'Havuz B (11-12 vs 21-22)', highRange: '11-12', lowRange: '21-22',
+                  high: [st[10], st[11]].filter(Boolean), low: [st[20], st[21]].filter(Boolean) },
+                { label: 'Havuz C (13-14 vs 19-20)', highRange: '13-14', lowRange: '19-20',
+                  high: [st[12], st[13]].filter(Boolean), low: [st[18], st[19]].filter(Boolean) },
+                { label: 'Havuz D (15-16 vs 17-18)', highRange: '15-16', lowRange: '17-18',
+                  high: [st[14], st[15]].filter(Boolean), low: [st[16], st[17]].filter(Boolean) },
+            ].filter(g => g.high.length > 0 && g.low.length > 0);
+
+            const drawn = new Set(state.playoffPairs.flatMap(p => [p.team1, p.team2]));
             const temp    = state._playoffTemp || {};
             const selHigh = temp.selHigh || null;
             const selLow  = temp.selLow  || null;
             const hidHigh = temp.hidHigh || null;
             const hidLow  = temp.hidLow  || null;
             const getTeamLeague = (n) => this.teams.find(t => t.name === n)?.league || '';
-            const gi = state.playoffPairs.length;
-            const currentGroup = gi < pgDefs.length ? pgDefs[gi] : null;
+            const totalPairs = state.playoffPairs.length;
+            const activePoolIdx = Math.floor(totalPairs / 2);
+            const activePool = activePoolIdx < poolDefs.length ? poolDefs[activePoolIdx] : null;
 
             const renderBall = (team, side, selH, selL, hidH, hidL, gtl) => {
                 const revealed  = side === 'high' ? selH : selL;
                 const hidden    = side === 'high' ? hidH : hidL;
                 const otherRev  = side === 'high' ? selL : selH;
                 const thisLig   = gtl(team);
-                const otherLig  = otherRev ? gtl(otherRev) : null;
-                const sameLeague = otherLig && otherLig === thisLig && otherLig !== '';
-                const safeTeam = team.replace(/'/g, "\\'");
-
+                const safeTeam  = team.replace(/'/g, "\\'");
+                if (drawn.has(team)) {
+                    return `<div class="lottery-ball ball-disabled"><span class="ball-icon">✅</span><span class="ball-hint" style="font-size:0.65rem">Eşleşti</span></div>`;
+                }
                 if (hidden === team) {
                     return `<div class="lottery-ball ball-hidden" onclick="window.footballSim._poReveal('${side}')">
                         <span class="ball-icon">⚽</span><span class="ball-hint">Tıkla &amp; Aç</span>
@@ -1780,11 +2938,6 @@ class FootballSimulation {
                         <span class="ball-name">${team}</span><span class="ball-league">${thisLig}</span>
                     </div>`;
                 }
-                if (sameLeague) {
-                    return `<div class="lottery-ball ball-disabled" title="Aynı lig: ${thisLig}">
-                        <span class="ball-icon">⚽</span><span class="ball-hint" style="color:#f87171;font-size:0.65rem">Aynı lig</span>
-                    </div>`;
-                }
                 return `<div class="lottery-ball ball-available" onclick="window.footballSim._poSelect('${safeTeam}','${side}')">
                     <span class="ball-icon">⚽</span><span class="ball-hint">Seç</span>
                 </div>`;
@@ -1792,8 +2945,8 @@ class FootballSimulation {
 
             html += `<div class="draw-ceremony">
                 <h4>🎯 Playoff Kura Çekimi</h4>
-                <p>Sol top = üst sıra, sağ top = alt sıra. Topa tıkla, takım açılır. İki taraftan birer top seçince eşleşme oluşur.</p>
-                <div class="draw-progress"><div class="draw-progress-fill" style="width:${gi/4*100}%"></div></div>
+                <p>Her havuzdan sol (üst sıra) ve sağ (alt sıra) taraftan birer top seç. Önce tıkla seç (gizli), sonra tekrar tıkla aç. 2 eşleşme dolunca sonraki havuz açılır.</p>
+                <div class="draw-progress"><div class="draw-progress-fill" style="width:${totalPairs/8*100}%"></div></div>
 
                 <div class="draw-pairs-container">
                     ${state.playoffPairs.map(pair => `
@@ -1801,15 +2954,16 @@ class FootballSimulation {
                             <div class="draw-pair-teams">${pair.team1} <span class="vs">vs</span> ${pair.team2}</div>
                             <div class="draw-pair-league">${getTeamLeague(pair.team1)} — ${getTeamLeague(pair.team2)}</div>
                         </div>`).join('')}
-                    ${gi < 4 ? pgDefs.slice(gi).map(g => `
+                    ${totalPairs < 8 ? Array(8 - totalPairs).fill(0).map((_,idx) => `
                         <div class="draw-pair pending">
-                            <div class="draw-pair-teams"><span>${g.label} — ${g.highRange} vs ${g.lowRange} bekleniyor</span></div>
+                            <div class="draw-pair-teams"><span>Eşleşme ${totalPairs + idx + 1} bekleniyor</span></div>
                         </div>`).join('') : ''}
                 </div>`;
 
-            if (currentGroup) {
-                const highTeams = currentGroup.high.filter(t => !drawn.has(t));
-                const lowTeams  = currentGroup.low.filter(t => !drawn.has(t));
+            if (activePool) {
+                const highTeams = activePool.high;
+                const lowTeams  = activePool.low;
+                const pairsInPool = totalPairs % 2;
                 const statusMsg = (selHigh && selLow)
                     ? `<div class="draw-status success">✅ Eşleşme hazır: <strong>${selHigh}</strong> <span class="vs">vs</span> <strong>${selLow}</strong>
                         <button class="btn btn-success btn-sm" onclick="window.footballSim._poConfirm()" style="margin-left:.5rem">Onayla</button>
@@ -1817,28 +2971,27 @@ class FootballSimulation {
                        </div>`
                     : (hidHigh || hidLow)
                     ? `<div class="draw-status warning">⚠️ Seçilen topa tıklayarak açın</div>`
-                    : `<div class="draw-status">🎯 Sol veya sağ taraftan bir topa tıkla</div>`;
+                    : `<div class="draw-status">🎯 Sol taraftan 1 top seç (${activePool.highRange}. sıra), ardından sağ taraftan 1 top seç (${activePool.lowRange}. sıra)</div>`;
 
                 html += `<div class="draw-selection-area">
-                    <h5>${currentGroup.label}: Sıra ${currentGroup.highRange} vs ${currentGroup.lowRange}</h5>
+                    <h5>${activePool.label} — ${pairsInPool === 0 ? '1. Eşleşme' : '2. Eşleşme'}</h5>
                     ${statusMsg}
                     <div class="balls-arena">
                         <div class="balls-bowl">
-                            <div class="bowl-label">🥇 Üst Sıra (${currentGroup.highRange})</div>
+                            <div class="bowl-label">🥇 Üst Sıra (${activePool.highRange})</div>
                             <div class="balls-row">
                                 ${highTeams.map(t => renderBall(t,'high',selHigh,selLow,hidHigh,hidLow,getTeamLeague)).join('')}
                             </div>
                         </div>
                         <div class="balls-vs">VS</div>
                         <div class="balls-bowl">
-                            <div class="bowl-label">🎯 Alt Sıra (${currentGroup.lowRange})</div>
+                            <div class="bowl-label">🎯 Alt Sıra (${activePool.lowRange})</div>
                             <div class="balls-row">
                                 ${lowTeams.map(t => renderBall(t,'low',selHigh,selLow,hidHigh,hidLow,getTeamLeague)).join('')}
                             </div>
                         </div>
                     </div>
-                    ${(selHigh||selLow||hidHigh||hidLow)?`<div style="text-align:center;margin-top:.5rem"><button class="btn btn-secondary btn-sm" onclick="window.footballSim._poReset()">Seçimi Sıfırla</button></div>`:''}
-                </div>`;
+                    ${(selHigh||selLow||hidHigh||hidLow)?`<div style="text-align:center;margin-top:.5rem"><button class="btn btn-secondary btn-sm" onclick="window.footballSim._poReset()">Seçimi Sıfırla</button></div>`:''}                </div>`;
             } else {
                 html += `<div class="draw-status success" style="margin-top:1rem">🏆 Tüm eşleşmeler tamamlandı!
                     <button class="btn btn-success" onclick="window.footballSim.finishPlayoffDraw('${comp}')" style="margin-left:.5rem">Playoff Turu Başlat</button>
@@ -1846,20 +2999,67 @@ class FootballSimulation {
             }
             html += `</div>`;
         }
-
-
-
         if (state.phase === 'playoff') {
-            html += `<h4>Playoff (İki maçlı)</h4>`;
+            html += `<h4>⚔️ Playoff Turu (8 Eşleşme, 2 Maçlı)</h4>
+            <div class="playoff-ties-container">`;
             (state.playoffResults || []).forEach((pair, i) => {
                 const l1 = pair.leg1Home != null ? `${pair.leg1Home}-${pair.leg1Away}` : '-';
                 const l2 = pair.leg2Home != null ? `${pair.leg2Home}-${pair.leg2Away}` : '-';
-                const leg1Btn = pair.leg1Home == null ? `<button class="btn btn-sm" onclick="window.footballSim.simulatePlayoffLeg('${comp}', ${i}, 1);">1. maç simüle</button>` : '';
-                const leg2Btn = pair.leg2Home == null ? `<button class="btn btn-sm" onclick="window.footballSim.simulatePlayoffLeg('${comp}', ${i}, 2);">2. maç simüle</button>` : '';
-                html += `<div class="playoff-tie">${pair.team1} vs ${pair.team2} — 1. maç: ${l1} ${leg1Btn} | 2. maç: ${l2} ${leg2Btn}</div>`;
+                const leg1Btn = pair.leg1Home == null
+                    ? `<button class="btn btn-sm btn-primary" onclick="window.footballSim.simulatePlayoffLeg('${comp}', ${i}, 1);">▶ 1. Maç</button>`
+                    : '';
+                const leg2Btn = pair.leg2Home == null && pair.leg1Home != null
+                    ? `<button class="btn btn-sm btn-primary" onclick="window.footballSim.simulatePlayoffLeg('${comp}', ${i}, 2);">▶ 2. Maç</button>`
+                    : (pair.leg2Home == null ? `<button class="btn btn-sm btn-secondary" disabled title="Önce 1. maçı oynayın">▶ 2. Maç</button>` : '');
+                let totalInfo = '';
+                if (pair.leg1Home != null && pair.leg2Home != null) {
+                    const total1 = pair.leg1Home + pair.leg2Away;
+                    const total2 = pair.leg1Away + pair.leg2Home;
+                    if (total1 > total2) {
+                        totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} 🏆 <strong>${pair.team1}</strong></div>`;
+                    } else if (total2 > total1) {
+                        totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} 🏆 <strong>${pair.team2}</strong></div>`;
+                    } else if (pair.penaltyWinner) {
+                        totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} — Penaltılar: ${pair.team1} <strong>${pair.pen1||0}</strong> - <strong>${pair.pen2||0}</strong> ${pair.team2} 🏆 <strong>${pair.penaltyWinner}</strong></div>`;
+                    } else if (pair.penaltyInProgress) {
+                        const shots1 = pair.penaltyShots1 || [];
+                        const shots2 = pair.penaltyShots2 || [];
+                        const penHtml = `<div class="penalty-shootout">
+                            <strong>🥅 Penaltı Atışları</strong>
+                            <div class="penalty-grid">
+                                <div class="penalty-team"><span class="pen-team-name">${pair.team1}</span><div class="pen-shots">${shots1.map(x=>x?'✅':'❌').join(' ')}</div><span class="pen-score">${shots1.filter(Boolean).length}</span></div>
+                                <div class="penalty-team"><span class="pen-team-name">${pair.team2}</span><div class="pen-shots">${shots2.map(x=>x?'✅':'❌').join(' ')}</div><span class="pen-score">${shots2.filter(Boolean).length}</span></div>
+                            </div>
+                            <button class="btn btn-sm btn-danger" onclick="window.footballSim.shootPenaltyPlayoff('${comp}', ${i})">🥅 Penaltı At</button>
+                        </div>`;
+                        totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} — <strong>Penaltılara gidiliyor!</strong></div>${penHtml}`;
+                    } else {
+                        totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} — <strong>Beraberlik!</strong>
+                            <button class="btn btn-sm btn-danger" onclick="window.footballSim.startPenaltyPlayoff('${comp}', ${i})">🥅 Penaltılara Git</button></div>`;
+                    }
+                }
+                html += `<div class="playoff-tie">
+                    <div class="playoff-tie-header"><strong>E${i+1}:</strong> ${pair.team1} vs ${pair.team2}</div>
+                    <div class="playoff-legs">
+                        <span class="leg-label">1. Maç (Ev: ${pair.team1}):</span> <span class="leg-score">${l1}</span> ${leg1Btn}
+                        &nbsp;
+                        <span class="leg-label">2. Maç (Ev: ${pair.team2}):</span> <span class="leg-score">${l2}</span> ${leg2Btn}
+                    </div>
+                    ${totalInfo}
+                </div>`;
             });
-            const allPlayoffDone = (state.playoffResults || []).every(p => p.leg1Home != null && p.leg2Home != null);
-            if (allPlayoffDone) html += `<button class="btn btn-success mt-2" onclick="window.footballSim.openR16Draw('${comp}');"><i class="fas fa-random"></i> Son 16 Kura Çekimi</button>`;
+            html += `</div>`;
+            const allPlayoffDone = (state.playoffResults || []).every(p => {
+                if (p.leg1Home == null || p.leg2Home == null) return false;
+                const t1 = (p.leg1Home||0) + (p.leg2Away||0);
+                const t2 = (p.leg1Away||0) + (p.leg2Home||0);
+                return t1 !== t2 || p.penaltyWinner != null;
+            });
+            if (allPlayoffDone) {
+                html += `<div style="text-align:center;margin-top:1rem"><button class="btn btn-success" onclick="window.footballSim.openR16Draw('${comp}');"><i class="fas fa-random"></i> Son 16 Kura Çekimi</button></div>`;
+            } else {
+                html += `<div style="text-align:center;margin-top:1rem"><button class="btn btn-warning" onclick="window.footballSim.simulateAllPlayoffLegs('${comp}')"><i class="fas fa-forward"></i> Tüm Playoff Maçlarını Simüle Et</button></div>`;
+            }
         }
 
         if (state.phase === 'r16_draw') {
@@ -1962,115 +3162,168 @@ class FootballSimulation {
 
 
         if (state.phase === 'r16') {
-            html += `<h4>Son 16</h4><p>Kura tamamlandı. Maç simülasyonu bu aşamada eklenebilir.</p>`;
-            
-            // Son 16 maçları varsa ve hepsi oynandıysa çeyrek final kurası butonu
+            html += `<h4>🏆 Son 16 Turu (8 Eşleşme, 2 Maçlı)</h4>
+            <div class="playoff-ties-container">`;
             const r16Results = state.knockoutResults.r16 || [];
-            const allR16Played = r16Results.length === 8 && r16Results.every(r => r.homeGoals != null && r.awayGoals != null);
-            
+            (state.r16Pairs || []).forEach((pair, i) => {
+                const res = r16Results[i] || {};
+                const l1 = res.leg1Home != null ? `${res.leg1Home}-${res.leg1Away}` : '-';
+                const l2 = res.leg2Home != null ? `${res.leg2Home}-${res.leg2Away}` : '-';
+                const leg1Btn = res.leg1Home == null
+                    ? `<button class="btn btn-sm btn-primary" onclick="window.footballSim.simulateR16Leg('${comp}', ${i}, 1);">▶ 1. Maç</button>`
+                    : '';
+                const leg2Btn = res.leg2Home == null && res.leg1Home != null
+                    ? `<button class="btn btn-sm btn-primary" onclick="window.footballSim.simulateR16Leg('${comp}', ${i}, 2);">▶ 2. Maç</button>`
+                    : (res.leg2Home == null ? `<button class="btn btn-sm btn-secondary" disabled title="Önce 1. maçı oynayın">▶ 2. Maç</button>` : '');
+                let totalInfo = '';
+                if (res.leg1Home != null && res.leg2Home != null) {
+                    const total1 = res.leg1Home + res.leg2Away;
+                    const total2 = res.leg1Away + res.leg2Home;
+                    if (total1 !== total2) {
+                        const winner = total1 > total2 ? pair.team1 : pair.team2;
+                        totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} 🏆 <strong>${winner}</strong></div>`;
+                    } else if (res.penaltyWinner) {
+                        totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} — Penaltılar: ${pair.team1} <strong>${res.pen1||0}</strong> - <strong>${res.pen2||0}</strong> ${pair.team2} 🏆 <strong>${res.penaltyWinner}</strong></div>`;
+                    } else if (res.penaltyInProgress) {
+                        const shots1 = res.penaltyShots1 || [];
+                        const shots2 = res.penaltyShots2 || [];
+                        const penHtml = `<div class="penalty-shootout">
+                            <h6>⚽ Penaltı Atışları</h6>
+                            <div class="penalty-grid">
+                                <div class="penalty-team">
+                                    <span class="pen-team-name">${pair.team1}</span>
+                                    <div class="pen-shots">${shots1.map(s => s ? '✅' : '❌').join(' ')}</div>
+                                    <span class="pen-score">${shots1.filter(s=>s).length}</span>
+                                </div>
+                                <div class="penalty-team">
+                                    <span class="pen-team-name">${pair.team2}</span>
+                                    <div class="pen-shots">${shots2.map(s => s ? '✅' : '❌').join(' ')}</div>
+                                    <span class="pen-score">${shots2.filter(s=>s).length}</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-danger btn-sm mt-2" onclick="window.footballSim.shootPenaltyR16('${comp}', ${i})">⚽ Sonraki Atış</button>
+                        </div>`;
+                        totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} — <strong>Penaltılara gidiliyor!</strong></div>${penHtml}`;
+                    } else {
+                        totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} — <strong>Beraberlik!</strong>
+                            <button class="btn btn-danger btn-sm" style="margin-left:.5rem" onclick="window.footballSim.startPenaltyShootoutR16('${comp}', ${i})">⚽ Penaltılara Başla</button>
+                        </div>`;
+                    }
+                }
+                html += `<div class="playoff-tie">
+                    <div class="playoff-tie-header"><strong>E${i+1}:</strong> ${pair.team1} <em>(Seri Başı)</em> vs ${pair.team2}</div>
+                    <div class="playoff-legs">
+                        <span class="leg-label">1. Maç (Ev: ${pair.team1}):</span> <span class="leg-score">${l1}</span> ${leg1Btn}
+                        &nbsp;
+                        <span class="leg-label">2. Maç (Ev: ${pair.team2}):</span> <span class="leg-score">${l2}</span> ${leg2Btn}
+                    </div>
+                    ${totalInfo}
+                </div>`;
+            });
+            html += `</div>`;
+            const allR16Played = r16Results.length === 8 && r16Results.every(r => {
+                if (r.leg1Home == null || r.leg2Home == null) return false;
+                const t1 = (r.leg1Home||0) + (r.leg2Away||0);
+                const t2 = (r.leg1Away||0) + (r.leg2Home||0);
+                return t1 !== t2 || r.penaltyWinner != null;
+            });
             if (allR16Played) {
                 html += `<div style="text-align: center; margin-top: 1rem;">
-                    <button class="btn btn-success" onclick="window.footballSim.openQFDraw('${comp}');">
-                        <i class="fas fa-random"></i> Çeyrek Final Kura Çekimi
+                    <button class="btn btn-success" onclick="window.footballSim.startQFDirect('${comp}');">
+                        <i class="fas fa-trophy"></i> Çeyrek Final Başlat
                     </button>
                 </div>`;
+            } else {
+                html += `<div style="text-align:center;margin-top:1rem"><button class="btn btn-warning" onclick="window.footballSim.simulateAllR16Legs('${comp}')"><i class="fas fa-forward"></i> Tüm Son 16 Maçlarını Simüle Et</button></div>`;
             }
         }
 
-        if (state.phase === 'qf_draw') {
-            const r16Winners = this.getR16Winners(comp);
-            if (r16Winners.length === 8) {
-                const used = new Set(state.qfPairs || []);
-                
-                // Takımların lig bilgilerini al
-                const getTeamLeague = (teamName) => {
-                    const team = this.teams.find(t => t.name === teamName);
-                    return team ? team.league : '';
-                };
-                
-                html += `
-                    <div class="draw-ceremony">
-                        <h4>🏆 Çeyrek Final Kura Çekimi</h4>
-                        <p>Son 16 kazananları eşleşiyor (aynı ligden takımlar eşleşemez)</p>
-                        
-                        <div class="draw-progress">
-                            <div class="draw-progress-fill" style="width: ${(state.qfPairs.length / 4 * 100)}%"></div>
-                        </div>
-                        
-                        <div class="draw-pairs-container">
-                            ${state.qfPairs.map(pair => `
-                                <div class="draw-pair">
-                                    <div class="draw-pair-teams">
-                                        ${pair.team1} <span class="vs">vs</span> ${pair.team2}
-                                    </div>
-                                    <div class="draw-pair-league">${getTeamLeague(pair.team1)} vs ${getTeamLeague(pair.team2)}</div>
+        if (state.phase === 'qf' || state.phase === 'sf' || state.phase === 'final' || state.phase === 'done') {
+            const renderKnockoutRound = (roundKey, roundLabel, pairs, results, nextFn, isFinal) => {
+                if (!pairs || pairs.length === 0) return '';
+                let rHtml = `<h4>⚔️ ${roundLabel}</h4><div class="playoff-ties-container">`;
+                pairs.forEach((pair, i) => {
+                    const res = (results && results[i]) || {};
+                    const l1 = res.leg1Home != null ? `${res.leg1Home}-${res.leg1Away}` : '-';
+                    const l2 = !isFinal ? (res.leg2Home != null ? `${res.leg2Home}-${res.leg2Away}` : '-') : null;
+                    const leg1Btn = res.leg1Home == null
+                        ? `<button class="btn btn-sm btn-primary" onclick="window.footballSim.simulateKOLeg('${comp}','${roundKey}',${i},1);">▶ 1. Maç</button>`
+                        : '';
+                    const leg2Btn = !isFinal ? (res.leg2Home == null && res.leg1Home != null
+                        ? `<button class="btn btn-sm btn-primary" onclick="window.footballSim.simulateKOLeg('${comp}','${roundKey}',${i},2);">▶ 2. Maç</button>`
+                        : (res.leg2Home == null ? `<button class="btn btn-sm btn-secondary" disabled>▶ 2. Maç</button>` : '')) : '';
+                    let totalInfo = '';
+                    const bothPlayed = isFinal ? res.leg1Home != null : (res.leg1Home != null && res.leg2Home != null);
+                    if (bothPlayed) {
+                        const total1 = isFinal ? res.leg1Home : (res.leg1Home + res.leg2Away);
+                        const total2 = isFinal ? res.leg1Away : (res.leg1Away + res.leg2Home);
+                        if (total1 !== total2) {
+                            const winner = total1 > total2 ? pair.team1 : pair.team2;
+                            totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} 🏆 <strong>${winner}</strong></div>`;
+                        } else if (res.penaltyWinner) {
+                            totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} — Penaltılar: <strong>${res.pen1||0}</strong>-<strong>${res.pen2||0}</strong> 🏆 <strong>${res.penaltyWinner}</strong></div>`;
+                        } else if (res.penaltyInProgress) {
+                            const s1 = res.penaltyShots1||[], s2 = res.penaltyShots2||[];
+                            totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} — Penaltılara gidiliyor!</div>
+                            <div class="penalty-shootout">
+                                <h6>⚽ Penaltı Atışları</h6>
+                                <div class="penalty-grid">
+                                    <div class="penalty-team"><span class="pen-team-name">${pair.team1}</span><div class="pen-shots">${s1.map(x=>x?'✅':'❌').join(' ')}</div><span class="pen-score">${s1.filter(Boolean).length}</span></div>
+                                    <div class="penalty-team"><span class="pen-team-name">${pair.team2}</span><div class="pen-shots">${s2.map(x=>x?'✅':'❌').join(' ')}</div><span class="pen-score">${s2.filter(Boolean).length}</span></div>
                                 </div>
-                            `).join('')}
-                            
-                            ${Array(4 - state.qfPairs.length).fill(0).map((_, index) => `
-                                <div class="draw-pair" style="opacity: 0.6; border-style: dashed;">
-                                    <div class="draw-pair-teams">
-                                        <span style="color: #94a3b8;">Eşleşme ${state.qfPairs.length + index + 1} bekleniyor</span>
-                                    </div>
-                                </div>
-                            `).join('')}
+                                <button class="btn btn-danger btn-sm mt-2" onclick="window.footballSim.shootPenaltyKO('${comp}','${roundKey}',${i})">⚽ Sonraki Atış</button>
+                            </div>`;
+                        } else {
+                            totalInfo = `<div class="playoff-total">Toplam: ${pair.team1} <strong>${total1}</strong> - <strong>${total2}</strong> ${pair.team2} — <strong>Beraberlik!</strong>
+                                <button class="btn btn-danger btn-sm" style="margin-left:.5rem" onclick="window.footballSim.startPenaltyKO('${comp}','${roundKey}',${i})">⚽ Penaltılara Başla</button></div>`;
+                        }
+                    }
+                    rHtml += `<div class="playoff-tie">
+                        <div class="playoff-tie-header"><strong>E${i+1}:</strong> ${pair.team1} vs ${pair.team2}</div>
+                        <div class="playoff-legs">
+                            <span class="leg-label">1. Maç (Ev: ${pair.team1}):</span> <span class="leg-score">${l1}</span> ${leg1Btn}
+                            ${!isFinal ? `&nbsp;<span class="leg-label">2. Maç (Ev: ${pair.team2}):</span> <span class="leg-score">${l2}</span> ${leg2Btn}` : ''}
                         </div>
-                        
-                        <div class="draw-selection-area">
-                            <h5>Sıra ${state.qfPairs.length + 1}. Eşleşme İçin Takım Seçimi</h5>
-                            ${state._qfTemp && state._qfTemp[comp] ? `
-                                <div class="draw-status">
-                                    Seçilen takım: <strong>${state._qfTemp[comp].teamA}</strong> - Şimdi rakibini seçin
-                                </div>
-                            ` : ''}
-                            
-                            <div class="qf-draw-container">
-                                ${r16Winners.map((team, index) => {
-                                    if (used.has(team)) return '';
-                                    
-                                    const teamLeague = getTeamLeague(team);
-                                    const selectedTeam = state._qfTemp && state._qfTemp[comp] ? state._qfTemp[comp].teamA : null;
-                                    const selectedLeague = selectedTeam ? getTeamLeague(selectedTeam) : '';
-                                    const isDisabled = selectedTeam && teamLeague === selectedLeague;
-                                    
-                                    if (selectedTeam && team !== selectedTeam) {
-                                        // Rakip seçimi
-                                        return `
-                                            <button class="draw-team-button qf-opponent ${isDisabled ? 'disabled' : ''}" 
-                                                    onclick="window.footballSim._qfPick('${comp}', '${selectedTeam.replace(/'/g, "\\'")}', '${team.replace(/'/g, "\\'")}')"
-                                                    ${isDisabled ? 'disabled title="Aynı ligden takımlar eşleşemez"' : ''}>
-                                                ${team}
-                                                ${isDisabled ? '<span class="team-league">' + teamLeague + '</span>' : ''}
-                                            </button>
-                                        `;
-                                    } else if (!selectedTeam) {
-                                        // İlk takım seçimi
-                                        return `
-                                            <button class="draw-team-button qf-first" 
-                                                    onclick="window.footballSim._qfPick('${comp}', '${team.replace(/'/g, "\\'")}', null)">
-                                                ${team}
-                                            </button>
-                                        `;
-                                    }
-                                    return '';
-                                }).filter(Boolean).join('')}
-                            </div>
-                            
-                            <div class="draw-actions">
-                                ${state._qfTemp && state._qfTemp[comp] ? `
-                                    <button class="btn btn-secondary" onclick="window.footballSim._qfPick('${comp}', null, null)">
-                                        Seçimi İptal Et
-                                    </button>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-        }
+                        ${totalInfo}
+                    </div>`;
+                });
+                rHtml += '</div>';
+                // Check all done
+                const allDone = pairs.every((p,i) => {
+                    const r = (results && results[i]) || {};
+                    const bothPlayed = isFinal ? r.leg1Home != null : (r.leg1Home != null && r.leg2Home != null);
+                    if (!bothPlayed) return false;
+                    const t1 = isFinal ? r.leg1Home : (r.leg1Home + r.leg2Away);
+                    const t2 = isFinal ? r.leg1Away : (r.leg1Away + r.leg2Home);
+                    return t1 !== t2 || r.penaltyWinner != null;
+                });
+                if (allDone && nextFn) rHtml += `<div style="text-align:center;margin-top:1rem">${nextFn}</div>`;
+                else if (!allDone) rHtml += `<div style="text-align:center;margin-top:1rem"><button class="btn btn-warning" onclick="window.footballSim.simulateAllKOLegs('${comp}','${roundKey}')"><i class="fas fa-forward"></i> Tümünü Simüle Et</button></div>`;
+                return rHtml;
+            };
 
-        if (state.phase === 'qf') {
-            html += `<h4>Çeyrek Final</h4><p>Çeyrek final eşleşmeleri tamamlandı. Yarı final için maçlar simüle edilebilir.</p>`;
+            const qfPairs = state.qfPairs || [];
+            const qfResults = state.knockoutResults.qf || qfPairs.map(()=>({}));
+            const sfPairs = state.sfPairs || [];
+            const sfResults = state.knockoutResults.sf || sfPairs.map(()=>({}));
+            const finalPairs = state.finalPair ? [state.finalPair] : [];
+            const finalResults = state.knockoutResults.final || [{}];
+
+            html += renderKnockoutRound('qf', '🏆 Çeyrek Final (2 Maçlı)', qfPairs, qfResults,
+                qfPairs.length === 4 ? `<button class="btn btn-success" onclick="window.footballSim.advanceToSF('${comp}')"><i class="fas fa-trophy"></i> Yarı Final Başlat</button>` : null, false);
+
+            if (state.phase === 'sf' || state.phase === 'final' || state.phase === 'done') {
+                html += renderKnockoutRound('sf', '🏆 Yarı Final (2 Maçlı)', sfPairs, sfResults,
+                    sfPairs.length === 2 ? `<button class="btn btn-success" onclick="window.footballSim.advanceToFinal('${comp}')"><i class="fas fa-trophy"></i> Final Başlat</button>` : null, false);
+            }
+            if (state.phase === 'final' || state.phase === 'done') {
+                html += renderKnockoutRound('final', '🏆 FİNAL (Tek Maç)', finalPairs, finalResults, null, true);
+                const fr = finalResults[0] || {};
+                if (fr.leg1Home != null && (fr.leg1Home !== fr.leg1Away || fr.penaltyWinner)) {
+                    const winner = fr.penaltyWinner || (fr.leg1Home > fr.leg1Away ? finalPairs[0]?.team1 : finalPairs[0]?.team2);
+                    if (winner) html += `<div class="champion-banner">🏆 ŞAMPİYON: ${winner} 🏆</div>`;
+                }
+            }
         }
 
         html += `
@@ -2268,17 +3521,7 @@ class FootballSimulation {
             t.selLow  = t.hidLow;
             t.hidLow  = null;
         }
-        // Her iki taraf da açıldıysa → aynı lig kontrol
-        if (t.selHigh && t.selLow) {
-            const lgH = this.teams.find(x => x.name === t.selHigh)?.league || '';
-            const lgL = this.teams.find(x => x.name === t.selLow)?.league  || '';
-            if (lgH && lgL && lgH === lgL) {
-                alert(`Aynı ligden takımlar eşleşemez! (${lgH})\nBir seçimi sıfırlayın.`);
-                // Sadece yeni açılanı temizle
-                if (side === 'high') { t.selHigh = null; }
-                else                 { t.selLow  = null; }
-            }
-        }
+
         this.saveData();
         this.showEuropeanCompetition(comp);
     }
@@ -2289,12 +3532,6 @@ class FootballSimulation {
         const state = this.getEuropeanPlayableState(comp.toUpperCase());
         const t = state._playoffTemp || {};
         if (!t.selHigh || !t.selLow) return;
-        const lgH = this.teams.find(x => x.name === t.selHigh)?.league || '';
-        const lgL = this.teams.find(x => x.name === t.selLow)?.league  || '';
-        if (lgH && lgL && lgH === lgL) {
-            alert(`Aynı ligden takımlar eşleşemez! (${lgH})`);
-            return;
-        }
         if (!state.playoffPairs) state.playoffPairs = [];
         state.playoffPairs.push({ team1: t.selHigh, team2: t.selLow });
         state._playoffTemp = {};
@@ -2414,17 +3651,6 @@ class FootballSimulation {
             const leagueA = getTeamLeague(teamA);
             const leagueB = getTeamLeague(teamB);
             
-            if (leagueA && leagueB && leagueA === leagueB) {
-                alert(`Aynı ligden takımlar eşleşemez! (${leagueA})\nBaşka bir takım seçin.`);
-                // Seçimi temizle, kullanıcı tekrar seçsin
-                state._playoffTemp.selectedTeam = null;
-                state._playoffTemp.currentGroup = null;
-                state._playoffTemp.revealedTeam = null;
-                this.saveData();
-                this.showEuropeanCompetition(comp);
-                return;
-            }
-            
             if (!state.playoffPairs) state.playoffPairs = [];
             state.playoffPairs.push({ team1: teamA, team2: teamB });
             state._playoffTemp.selectedTeam = null;
@@ -2450,11 +3676,16 @@ class FootballSimulation {
         const state = this.getEuropeanPlayableState(activeComp.toUpperCase());
         const st = state.standingsOrder || [];
         
-        const playoffGroups = [
-            { high: st.slice(8, 10),  low: st.slice(22, 24) },
-            { high: st.slice(10, 12), low: st.slice(20, 22) },
-            { high: st.slice(12, 14), low: st.slice(18, 20) },
-            { high: st.slice(14, 16), low: st.slice(16, 18) }
+        // 8 tek eşleşme: sıra 9 vs 24, 10 vs 23, ..., 16 vs 17
+        const playoffSlots = [
+            { high: st[8],  low: st[23] },
+            { high: st[9],  low: st[22] },
+            { high: st[10], low: st[21] },
+            { high: st[11], low: st[20] },
+            { high: st[12], low: st[19] },
+            { high: st[13], low: st[18] },
+            { high: st[14], low: st[17] },
+            { high: st[15], low: st[16] },
         ];
         
         const drawn = new Set(state.playoffPairs.flatMap(p => [p.team1, p.team2]));
@@ -2463,29 +3694,16 @@ class FootballSimulation {
             return team ? team.league : '';
         };
         
-        const currentGroup = playoffGroups[groupIndex];
-        if (!currentGroup) { alert('Geçersiz grup!'); return; }
-        const availableHigh = currentGroup.high.filter(t => !drawn.has(t));
-        const availableLow  = currentGroup.low.filter(t => !drawn.has(t));
+        const slot = playoffSlots[groupIndex];
+        if (!slot || !slot.high || !slot.low) { alert('Geçersiz slot!'); return; }
+        if (drawn.has(slot.high) || drawn.has(slot.low)) { alert('Bu takımlar zaten eşleşti!'); return; }
         
-        for (let highTeam of availableHigh) {
-            const highLeague = getTeamLeague(highTeam);
-            for (let lowTeam of availableLow) {
-                const lowLeague = getTeamLeague(lowTeam);
-                if (!highLeague || !lowLeague || highLeague !== lowLeague) {
-                    state.playoffPairs.push({ team1: highTeam, team2: lowTeam });
-                    if (!state._playoffTemp) state._playoffTemp = {};
-                    state._playoffTemp.selectedTeam = null;
-                    state._playoffTemp.currentGroup = null;
-                    state._playoffTemp.revealedTeam = null;
-                    this.saveData();
-                    this.showEuropeanCompetition(activeComp);
-                    return;
-                }
-            }
-        }
-        
-        alert('Bu grup için uygun eşleşme bulunamadı! (Tüm takımlar aynı ligden olabilir)');
+        state.playoffPairs.push({ team1: slot.high, team2: slot.low });
+        if (!state._playoffTemp) state._playoffTemp = {};
+        state._playoffTemp.selHigh = null; state._playoffTemp.selLow = null;
+        state._playoffTemp.hidHigh = null; state._playoffTemp.hidLow = null;
+        this.saveData();
+        this.showEuropeanCompetition(activeComp);
     }
 
     _r16Pick(comp, which, index) {
@@ -2751,18 +3969,15 @@ class FootballSimulation {
         const state = this.getEuropeanPlayableState(comp);
         if (state.phase !== 'playoff_draw') return;
         const st = state.standingsOrder || [];
-        const groups = [
-            st.slice(8, 10), st.slice(10, 12), st.slice(12, 14), st.slice(14, 16),
-            st.slice(16, 18), st.slice(18, 20), st.slice(20, 22), st.slice(22, 24)
-        ];
-        const pairOpponent = [7, 6, 5, 4, 3, 2, 1, 0];
+        // 8 slot: sıra[8..15] vs sıra[23..16]
+        const highTeams = st.slice(8, 16);
+        const lowTeams  = [st[23], st[22], st[21], st[20], st[19], st[18], st[17], st[16]];
         const pi = parseInt(pairIndex, 10);
-        if (pi < 0 || pi > 3) return;
-        const high = groups[pi], low = groups[pairOpponent[pi]];
-        if (!high || !low || !high.includes(teamA) || !low.includes(teamB)) return;
+        if (pi < 0 || pi > 7) return;
+        if (!highTeams[pi] || !lowTeams[pi]) return;
+        if (!highTeams.includes(teamA) || !lowTeams.includes(teamB)) return;
         const league1 = this.teams.find(t => t.name === teamA)?.league || '';
         const league2 = this.teams.find(t => t.name === teamB)?.league || '';
-        if (league1 && league2 && league1 === league2) { alert(`Aynı ligden takımlar eşleşemez! (${league1})`); return; }
         if (state.playoffPairs.some(p => p.team1 === teamA || p.team2 === teamA || p.team1 === teamB || p.team2 === teamB)) return;
         state.playoffPairs.push({ team1: teamA, team2: teamB });
         this.saveData();
@@ -2791,17 +4006,95 @@ class FootballSimulation {
         this.showEuropeanCompetition(comp.toLowerCase());
     }
 
+    simulateAllPlayoffLegs(comp) {
+        const state = this.getEuropeanPlayableState(comp);
+        (state.playoffResults || []).forEach((pair, i) => {
+            if (pair.leg1Home == null) {
+                const h = this.teams.find(t => t.name === pair.team1) || { rating: 7 };
+                const a = this.teams.find(t => t.name === pair.team2) || { rating: 7 };
+                const res = this.simulateMatch(h, a, true);
+                pair.leg1Home = res.homeGoals; pair.leg1Away = res.awayGoals;
+            }
+            if (pair.leg2Home == null) {
+                const h = this.teams.find(t => t.name === pair.team2) || { rating: 7 };
+                const a = this.teams.find(t => t.name === pair.team1) || { rating: 7 };
+                const res = this.simulateMatch(h, a, true);
+                pair.leg2Home = res.homeGoals; pair.leg2Away = res.awayGoals;
+            }
+            // Eşitlik varsa otomatik penaltı
+            const t1 = (pair.leg1Home||0) + (pair.leg2Away||0);
+            const t2 = (pair.leg1Away||0) + (pair.leg2Home||0);
+            if (t1 === t2 && !pair.penaltyWinner) {
+                const ch1 = Math.min(0.85, Math.max(0.55, 0.65 + ((this.normalizeRating(this.teams.find(t=>t.name===pair.team1)?.rating)||7)-7)*0.025));
+                const ch2 = Math.min(0.85, Math.max(0.55, 0.65 + ((this.normalizeRating(this.teams.find(t=>t.name===pair.team2)?.rating)||7)-7)*0.025));
+                let p1=0, p2=0; const s1=[], s2=[];
+                for (let r=0; r<5; r++) { const g1=Math.random()<ch1; s1.push(g1); if(g1)p1++; const g2=Math.random()<ch2; s2.push(g2); if(g2)p2++; }
+                while(p1===p2) { const g1=Math.random()<ch1; s1.push(g1); if(g1)p1++; const g2=Math.random()<ch2; s2.push(g2); if(g2)p2++; }
+                pair.penaltyShots1=s1; pair.penaltyShots2=s2; pair.pen1=p1; pair.pen2=p2;
+                pair.penaltyWinner = p1>p2 ? pair.team1 : pair.team2;
+            }
+        });
+        this.saveData();
+        this.addActivity(`${this.europeanCompetitions[comp.toUpperCase()].name} tüm playoff maçları simüle edildi`);
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    startPenaltyPlayoff(comp, pairIndex) {
+        const state = this.getEuropeanPlayableState(comp);
+        const pair = state.playoffResults && state.playoffResults[pairIndex];
+        if (!pair) return;
+        pair.penaltyInProgress = true;
+        pair.penaltyShots1 = []; pair.penaltyShots2 = [];
+        pair.pen1 = 0; pair.pen2 = 0;
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    shootPenaltyPlayoff(comp, pairIndex) {
+        const state = this.getEuropeanPlayableState(comp);
+        const pair = state.playoffResults && state.playoffResults[pairIndex];
+        if (!pair || !pair.penaltyInProgress) return;
+        const s1 = pair.penaltyShots1 || [], s2 = pair.penaltyShots2 || [];
+        const isTeam1Turn = s1.length <= s2.length;
+        const teamName = isTeam1Turn ? pair.team1 : pair.team2;
+        const rating = this.normalizeRating(this.teams.find(t=>t.name===teamName)?.rating) || 7;
+        const chance = Math.min(0.85, Math.max(0.55, 0.65 + (rating-7)*0.025));
+        const scored = Math.random() < chance;
+        if (isTeam1Turn) { s1.push(scored); if(scored) pair.pen1=(pair.pen1||0)+1; }
+        else { s2.push(scored); if(scored) pair.pen2=(pair.pen2||0)+1; }
+        pair.penaltyShots1 = s1; pair.penaltyShots2 = s2;
+        const maxR = 5;
+        if (s1.length === s2.length) {
+            const rem1 = Math.max(0, maxR - s1.length), rem2 = Math.max(0, maxR - s2.length);
+            if ((s1.length >= maxR && s2.length >= maxR && pair.pen1 !== pair.pen2) ||
+                (pair.pen1 - pair.pen2 > rem2) || (pair.pen2 - pair.pen1 > rem1)) {
+                pair.penaltyWinner = pair.pen1 > pair.pen2 ? pair.team1 : pair.team2;
+                pair.penaltyInProgress = false;
+            }
+        }
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
     openR16Draw(comp) {
         const state = this.getEuropeanPlayableState(comp);
         const seeded = (state.standingsOrder || []).slice(0, 8);
-        let playoffWinners = [];
-        if (state.playoffResults) playoffWinners = state.playoffResults.map(p => {
+        // Tüm playoff maçlarının (leg1 + leg2) tamamlandığını kontrol et
+        const allLegsPlayed = (state.playoffResults || []).length === 8 &&
+            state.playoffResults.every(p => p.leg1Home != null && p.leg2Home != null);
+        if (!allLegsPlayed) {
+            alert('Önce tüm playoff eşleşmelerini tamamlayın (8 eşleşme, her biri 2 maç).');
+            return;
+        }
+        let playoffWinners = state.playoffResults.map(p => {
             const g1 = (p.leg1Home || 0) + (p.leg2Away || 0);
             const g2 = (p.leg1Away || 0) + (p.leg2Home || 0);
-            return g1 > g2 ? p.team1 : g2 > g1 ? p.team2 : (Math.random() > 0.5 ? p.team1 : p.team2);
+            if (g1 > g2) return p.team1;
+            if (g2 > g1) return p.team2;
+            return p.penaltyWinner || null;
         }).filter(Boolean);
         if (seeded.length !== 8 || playoffWinners.length !== 8) {
-            alert('Önce playoff turlarını tamamlayın (8 eşleşme, her biri 2 maç).');
+            alert('Playoff tamamlanamadı. Lütfen kontrol edin.');
             return;
         }
         state.phase = 'r16_draw';
@@ -2818,12 +4111,6 @@ class FootballSimulation {
         const s = state.r16Seeded[seededIdx];
         const u = state.r16Unseeded[unseededIdx];
         if (!s || !u) return;
-        const leagueS = this.teams.find(t => t.name === s)?.league || '';
-        const leagueU = this.teams.find(t => t.name === u)?.league || '';
-        if (leagueS && leagueU && leagueS === leagueU) {
-            alert(`Aynı ligden takımlar eşleşemez! (${leagueS})`);
-            return;
-        }
         state.r16Pairs.push({ team1: s, team2: u });
         state.r16Seeded[seededIdx] = null;
         state.r16Unseeded[unseededIdx] = null;
@@ -2835,23 +4122,68 @@ class FootballSimulation {
         const state = this.getEuropeanPlayableState(comp);
         if (state.phase !== 'r16_draw' || state.r16Pairs.length !== 8) return;
         state.phase = 'r16';
-        state.knockoutResults.r16 = state.r16Pairs.map(() => ({}));
+        // Her eşleşme için leg1 ve leg2 formatında sonuç objesi oluştur
+        state.knockoutResults.r16 = state.r16Pairs.map(() => ({ leg1Home: null, leg1Away: null, leg2Home: null, leg2Away: null }));
         this.saveData();
         this.showEuropeanCompetition(comp.toLowerCase());
     }
 
-    // Son 16 kazananlarını belirle
+    simulateR16Leg(comp, pairIndex, leg) {
+        const state = this.getEuropeanPlayableState(comp);
+        const pair = state.r16Pairs[pairIndex];
+        if (!pair) return;
+        if (!state.knockoutResults.r16) state.knockoutResults.r16 = state.r16Pairs.map(() => ({ leg1Home: null, leg1Away: null, leg2Home: null, leg2Away: null }));
+        const res = state.knockoutResults.r16[pairIndex];
+        if (!res) return;
+        // Leg 1: seri başı (team1) ev sahibi; Leg 2: playoff kazananı (team2) ev sahibi
+        const [home, away] = leg === 1 ? [pair.team1, pair.team2] : [pair.team2, pair.team1];
+        const h = this.teams.find(t => t.name === home) || { rating: 7 };
+        const a = this.teams.find(t => t.name === away) || { rating: 7 };
+        const result = this.simulateMatch(h, a, true);
+        if (leg === 1) { res.leg1Home = result.homeGoals; res.leg1Away = result.awayGoals; }
+        else           { res.leg2Home = result.homeGoals; res.leg2Away = result.awayGoals; }
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    simulateAllR16Legs(comp) {
+        const state = this.getEuropeanPlayableState(comp);
+        if (!state.knockoutResults.r16) state.knockoutResults.r16 = state.r16Pairs.map(() => ({ leg1Home: null, leg1Away: null, leg2Home: null, leg2Away: null }));
+        (state.r16Pairs || []).forEach((pair, i) => {
+            const res = state.knockoutResults.r16[i];
+            if (!res) return;
+            if (res.leg1Home == null) {
+                const h = this.teams.find(t => t.name === pair.team1) || { rating: 7 };
+                const a = this.teams.find(t => t.name === pair.team2) || { rating: 7 };
+                const result = this.simulateMatch(h, a, true);
+                res.leg1Home = result.homeGoals; res.leg1Away = result.awayGoals;
+            }
+            if (res.leg2Home == null) {
+                const h = this.teams.find(t => t.name === pair.team2) || { rating: 7 };
+                const a = this.teams.find(t => t.name === pair.team1) || { rating: 7 };
+                const result = this.simulateMatch(h, a, true);
+                res.leg2Home = result.homeGoals; res.leg2Away = result.awayGoals;
+            }
+        });
+        this.saveData();
+        this.addActivity(`${this.europeanCompetitions[comp.toUpperCase()].name} tüm Son 16 maçları simüle edildi`);
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    // Son 16 kazananlarını belirle (iki maçlı sistem)
     getR16Winners(comp) {
         const state = this.getEuropeanPlayableState(comp);
         const r16Results = state.knockoutResults.r16 || [];
         const winners = [];
         
         if (r16Results.length === 8) {
-            r16Results.forEach((result, index) => {
-                if (result.homeGoals != null && result.awayGoals != null) {
+            r16Results.forEach((res, index) => {
+                if (res.leg1Home != null && res.leg2Home != null) {
                     const pair = state.r16Pairs[index];
                     if (pair) {
-                        const winner = result.homeGoals > result.awayGoals ? pair.team1 : pair.team2;
+                        const total1 = res.leg1Home + res.leg2Away;
+                        const total2 = res.leg1Away + res.leg2Home;
+                        const winner = total1 > total2 ? pair.team1 : total2 > total1 ? pair.team2 : (Math.random() > 0.5 ? pair.team1 : pair.team2);
                         winners.push(winner);
                     }
                 }
@@ -2910,6 +4242,220 @@ class FootballSimulation {
         state.knockoutResults.qf = state.qfPairs.map(() => ({}));
         this.saveData();
         this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+
+    // ─── KNOCKOUT DIRECT (QF/SF/FINAL - NO DRAW) ─────────────────────
+
+    startQFDirect(comp) {
+        const state = this.getEuropeanPlayableState(comp);
+        const winners = this.getR16WinnersWithPenalty(comp);
+        if (winners.length !== 8) {
+            alert('Önce tüm Son 16 maçlarını ve gerekirse penaltıları tamamlayın.');
+            return;
+        }
+        // Pair up sequentially: 1vs2, 3vs4, 5vs6, 7vs8
+        state.qfPairs = [
+            { team1: winners[0], team2: winners[1] },
+            { team1: winners[2], team2: winners[3] },
+            { team1: winners[4], team2: winners[5] },
+            { team1: winners[6], team2: winners[7] },
+        ];
+        state.knockoutResults.qf = state.qfPairs.map(() => ({ leg1Home: null, leg1Away: null, leg2Home: null, leg2Away: null }));
+        state.phase = 'qf';
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    getR16WinnersWithPenalty(comp) {
+        const state = this.getEuropeanPlayableState(comp);
+        const r16Results = state.knockoutResults.r16 || [];
+        const winners = [];
+        r16Results.forEach((res, i) => {
+            const pair = state.r16Pairs[i];
+            if (!pair || res.leg1Home == null || res.leg2Home == null) return;
+            const t1 = res.leg1Home + res.leg2Away;
+            const t2 = res.leg1Away + res.leg2Home;
+            if (t1 > t2) winners.push(pair.team1);
+            else if (t2 > t1) winners.push(pair.team2);
+            else if (res.penaltyWinner) winners.push(res.penaltyWinner);
+        });
+        return winners;
+    }
+
+    simulateKOLeg(comp, roundKey, pairIndex, leg) {
+        const state = this.getEuropeanPlayableState(comp);
+        const pairs = roundKey === 'qf' ? state.qfPairs : roundKey === 'sf' ? state.sfPairs : [state.finalPair];
+        const pair = pairs && pairs[pairIndex];
+        if (!pair) return;
+        if (!state.knockoutResults[roundKey]) state.knockoutResults[roundKey] = pairs.map(() => ({ leg1Home: null, leg1Away: null, leg2Home: null, leg2Away: null }));
+        const res = state.knockoutResults[roundKey][pairIndex];
+        if (!res) return;
+        const isFinal = roundKey === 'final';
+        const [home, away] = leg === 1 ? [pair.team1, pair.team2] : [pair.team2, pair.team1];
+        const h = this.teams.find(t => t.name === home) || { rating: 7 };
+        const a = this.teams.find(t => t.name === away) || { rating: 7 };
+        const result = this.simulateMatch(h, a, true);
+        if (leg === 1) { res.leg1Home = result.homeGoals; res.leg1Away = result.awayGoals; }
+        else { res.leg2Home = result.homeGoals; res.leg2Away = result.awayGoals; }
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    simulateAllKOLegs(comp, roundKey) {
+        const state = this.getEuropeanPlayableState(comp);
+        const pairs = roundKey === 'qf' ? state.qfPairs : roundKey === 'sf' ? state.sfPairs : [state.finalPair];
+        if (!pairs) return;
+        if (!state.knockoutResults[roundKey]) state.knockoutResults[roundKey] = pairs.map(() => ({ leg1Home: null, leg1Away: null, leg2Home: null, leg2Away: null }));
+        const isFinal = roundKey === 'final';
+        pairs.forEach((pair, i) => {
+            const res = state.knockoutResults[roundKey][i];
+            if (!res) return;
+            if (res.leg1Home == null) {
+                const h = this.teams.find(t => t.name === pair.team1) || { rating: 7 };
+                const a = this.teams.find(t => t.name === pair.team2) || { rating: 7 };
+                const r = this.simulateMatch(h, a, true);
+                res.leg1Home = r.homeGoals; res.leg1Away = r.awayGoals;
+            }
+            if (!isFinal && res.leg2Home == null) {
+                const h = this.teams.find(t => t.name === pair.team2) || { rating: 7 };
+                const a = this.teams.find(t => t.name === pair.team1) || { rating: 7 };
+                const r = this.simulateMatch(h, a, true);
+                res.leg2Home = r.homeGoals; res.leg2Away = r.awayGoals;
+            }
+            // Handle tie - auto penalty
+            const t1 = isFinal ? res.leg1Home : (res.leg1Home + res.leg2Away);
+            const t2 = isFinal ? res.leg1Away : (res.leg1Away + res.leg2Home);
+            if (t1 === t2 && !res.penaltyWinner) {
+                const ch1 = Math.min(0.85, Math.max(0.55, 0.65 + ((this.normalizeRating(this.teams.find(t=>t.name===pair.team1)?.rating)||7)-7)*0.025));
+                const ch2 = Math.min(0.85, Math.max(0.55, 0.65 + ((this.normalizeRating(this.teams.find(t=>t.name===pair.team2)?.rating)||7)-7)*0.025));
+                let p1=0, p2=0; const s1=[], s2=[];
+                for (let r=0; r<5; r++) { const g1=Math.random()<ch1; s1.push(g1); if(g1)p1++; const g2=Math.random()<ch2; s2.push(g2); if(g2)p2++; }
+                while(p1===p2) { const g1=Math.random()<ch1; s1.push(g1); if(g1)p1++; const g2=Math.random()<ch2; s2.push(g2); if(g2)p2++; }
+                res.penaltyShots1=s1; res.penaltyShots2=s2; res.pen1=p1; res.pen2=p2;
+                res.penaltyWinner = p1>p2 ? pair.team1 : pair.team2;
+            }
+        });
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    startPenaltyKO(comp, roundKey, pairIndex) {
+        const state = this.getEuropeanPlayableState(comp);
+        const pairs = roundKey === 'qf' ? state.qfPairs : roundKey === 'sf' ? state.sfPairs : [state.finalPair];
+        const pair = pairs && pairs[pairIndex];
+        if (!pair) return;
+        const res = state.knockoutResults[roundKey] && state.knockoutResults[roundKey][pairIndex];
+        if (!res) return;
+        res.penaltyInProgress = true;
+        res.penaltyShots1 = []; res.penaltyShots2 = [];
+        res.pen1 = 0; res.pen2 = 0;
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    shootPenaltyKO(comp, roundKey, pairIndex) {
+        const state = this.getEuropeanPlayableState(comp);
+        const pairs = roundKey === 'qf' ? state.qfPairs : roundKey === 'sf' ? state.sfPairs : [state.finalPair];
+        const pair = pairs && pairs[pairIndex];
+        if (!pair) return;
+        const res = state.knockoutResults[roundKey] && state.knockoutResults[roundKey][pairIndex];
+        if (!res || !res.penaltyInProgress) return;
+        const s1 = res.penaltyShots1 || [], s2 = res.penaltyShots2 || [];
+        const isTeam1Turn = s1.length <= s2.length;
+        const teamName = isTeam1Turn ? pair.team1 : pair.team2;
+        const rating = this.normalizeRating(this.teams.find(t=>t.name===teamName)?.rating) || 7;
+        const chance = Math.min(0.85, Math.max(0.55, 0.65 + (rating-7)*0.025));
+        const scored = Math.random() < chance;
+        if (isTeam1Turn) { s1.push(scored); if(scored) res.pen1=(res.pen1||0)+1; }
+        else { s2.push(scored); if(scored) res.pen2=(res.pen2||0)+1; }
+        res.penaltyShots1 = s1; res.penaltyShots2 = s2;
+        const maxR = 5;
+        if (s1.length === s2.length) {
+            const rem1 = Math.max(0, maxR - s1.length), rem2 = Math.max(0, maxR - s2.length);
+            if ((s1.length >= maxR && s2.length >= maxR && res.pen1 !== res.pen2) ||
+                (res.pen1 - res.pen2 > rem2) || (res.pen2 - res.pen1 > rem1)) {
+                res.penaltyWinner = res.pen1 > res.pen2 ? pair.team1 : pair.team2;
+                res.penaltyInProgress = false;
+            }
+        }
+        this.saveData();
+        this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    // R16 penalty variants
+    startPenaltyShootoutR16(comp, pairIndex) {
+        const state = this.getEuropeanPlayableState(comp);
+        const res = state.knockoutResults.r16 && state.knockoutResults.r16[pairIndex];
+        if (!res) return;
+        res.penaltyInProgress = true; res.penaltyShots1 = []; res.penaltyShots2 = []; res.pen1 = 0; res.pen2 = 0;
+        this.saveData(); this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    shootPenaltyR16(comp, pairIndex) {
+        const state = this.getEuropeanPlayableState(comp);
+        const pair = state.r16Pairs[pairIndex];
+        const res = state.knockoutResults.r16 && state.knockoutResults.r16[pairIndex];
+        if (!pair || !res || !res.penaltyInProgress) return;
+        const s1=res.penaltyShots1||[], s2=res.penaltyShots2||[];
+        const isTeam1Turn = s1.length <= s2.length;
+        const teamName = isTeam1Turn ? pair.team1 : pair.team2;
+        const rating = this.normalizeRating(this.teams.find(t=>t.name===teamName)?.rating)||7;
+        const chance = Math.min(0.85, Math.max(0.55, 0.65+(rating-7)*0.025));
+        const scored = Math.random() < chance;
+        if (isTeam1Turn) { s1.push(scored); if(scored) res.pen1=(res.pen1||0)+1; }
+        else { s2.push(scored); if(scored) res.pen2=(res.pen2||0)+1; }
+        res.penaltyShots1=s1; res.penaltyShots2=s2;
+        const maxR=5;
+        if (s1.length === s2.length) {
+            const rem1=Math.max(0,maxR-s1.length), rem2=Math.max(0,maxR-s2.length);
+            if ((s1.length>=maxR && s2.length>=maxR && res.pen1!==res.pen2)||
+                (res.pen1-res.pen2>rem2)||(res.pen2-res.pen1>rem1)) {
+                res.penaltyWinner = res.pen1>res.pen2 ? pair.team1 : pair.team2;
+                res.penaltyInProgress = false;
+            }
+        }
+        this.saveData(); this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    getKOWinners(comp, roundKey) {
+        const state = this.getEuropeanPlayableState(comp);
+        const pairs = roundKey === 'qf' ? state.qfPairs : roundKey === 'sf' ? state.sfPairs : [state.finalPair];
+        const results = state.knockoutResults[roundKey] || [];
+        const isFinal = roundKey === 'final';
+        return (pairs || []).map((pair, i) => {
+            const res = results[i] || {};
+            if (res.leg1Home == null) return null;
+            if (!isFinal && res.leg2Home == null) return null;
+            const t1 = isFinal ? res.leg1Home : (res.leg1Home + res.leg2Away);
+            const t2 = isFinal ? res.leg1Away : (res.leg1Away + res.leg2Home);
+            if (t1 > t2) return pair.team1;
+            if (t2 > t1) return pair.team2;
+            return res.penaltyWinner || null;
+        }).filter(Boolean);
+    }
+
+    advanceToSF(comp) {
+        const state = this.getEuropeanPlayableState(comp);
+        const qfWinners = this.getKOWinners(comp, 'qf');
+        if (qfWinners.length !== 4) { alert('Önce tüm çeyrek final maçlarını tamamlayın.'); return; }
+        state.sfPairs = [
+            { team1: qfWinners[0], team2: qfWinners[1] },
+            { team1: qfWinners[2], team2: qfWinners[3] },
+        ];
+        state.knockoutResults.sf = state.sfPairs.map(() => ({ leg1Home: null, leg1Away: null, leg2Home: null, leg2Away: null }));
+        state.phase = 'sf';
+        this.saveData(); this.showEuropeanCompetition(comp.toLowerCase());
+    }
+
+    advanceToFinal(comp) {
+        const state = this.getEuropeanPlayableState(comp);
+        const sfWinners = this.getKOWinners(comp, 'sf');
+        if (sfWinners.length !== 2) { alert('Önce tüm yarı final maçlarını tamamlayın.'); return; }
+        state.finalPair = { team1: sfWinners[0], team2: sfWinners[1] };
+        state.knockoutResults.final = [{ leg1Home: null, leg1Away: null }];
+        state.phase = 'final';
+        this.saveData(); this.showEuropeanCompetition(comp.toLowerCase());
     }
 
     renderCoefficients() {
@@ -3330,6 +4876,425 @@ class FootballSimulation {
         }
     }
 
+    showTeamProfile(teamName) {
+        const team = this.teams.find(t => t.name === teamName);
+        if (!team) return;
+
+        // Fetch all matches for this team in current season
+        const teamMatches = this.matches.filter(m =>
+            m.season === this.currentSeason &&
+            (m.homeTeam === teamName || m.awayTeam === teamName)
+        ).sort((a, b) => (a.week || 0) - (b.week || 0));
+
+        // Last 5 played matches
+        const playedMatches = teamMatches.filter(m => m.homeGoals !== undefined && m.homeGoals !== null);
+        const last5 = playedMatches.slice(-5);
+
+        // Upcoming = generate fixtures and find unplayed ones
+        const fixtures = this.generateLeagueFixtures(team.league);
+        const upcomingFixtures = fixtures.filter(f => {
+            const isThisTeam = f.homeTeam.name === teamName || f.awayTeam.name === teamName;
+            if (!isThisTeam) return false;
+            const played = this.matches.find(m =>
+                m.season === this.currentSeason &&
+                m.league === team.league &&
+                ((m.homeTeam === f.homeTeam.name && m.awayTeam === f.awayTeam.name) ||
+                 (m.homeTeam === f.awayTeam.name && m.awayTeam === f.homeTeam.name))
+            );
+            return !played;
+        }).slice(0, 5);
+
+        // League standings
+        const leagueTeams = this.teams.filter(t => t.league === team.league);
+        const leagueMatches = this.getLeagueMatches(team.league);
+        const standings = this.calculateStandings(leagueTeams, leagueMatches);
+        const teamStanding = standings.find(s => s.name === teamName);
+        const teamPosition = standings.findIndex(s => s.name === teamName) + 1;
+        const leagueRanking = this.getLeagueRanking(team.league);
+        const europeanSpots = this.getEuropeanSpots(leagueRanking);
+
+        // Form badges (last 5)
+        const formBadges = last5.map(m => {
+            const isHome = m.homeTeam === teamName;
+            const scored = isHome ? m.homeGoals : m.awayGoals;
+            const conceded = isHome ? m.awayGoals : m.homeGoals;
+            let res, cls;
+            if (scored > conceded) { res = 'G'; cls = 'form-w'; }
+            else if (scored === conceded) { res = 'B'; cls = 'form-d'; }
+            else { res = 'M'; cls = 'form-l'; }
+            const opp = isHome ? m.awayTeam : m.homeTeam;
+            return `<span class="form-badge ${cls}" title="${opp} (${scored}-${conceded})">${res}</span>`;
+        }).join('');
+
+        // History matches HTML
+        const historyHTML = playedMatches.length === 0
+            ? '<p class="no-data" style="font-size:.82rem">Henüz maç oynanmadı.</p>'
+            : playedMatches.map(m => {
+                const isHome = m.homeTeam === teamName;
+                const scored = isHome ? m.homeGoals : m.awayGoals;
+                const conceded = isHome ? m.awayGoals : m.homeGoals;
+                const opp = isHome ? m.awayTeam : m.homeTeam;
+                let resCls = scored > conceded ? 'res-w' : scored === conceded ? 'res-d' : 'res-l';
+                let resText = scored > conceded ? 'G' : scored === conceded ? 'B' : 'M';
+                const loc = isHome ? 'Ev' : 'Dep';
+                const clickAttr = m.id ? `onclick="window.footballSim.showMatchDetailsEnhanced('${m.id}')" style="cursor:pointer"` : '';
+                return `<div class="tp-match-row" ${clickAttr}>
+                    <span class="tp-week">H${m.week||'?'}</span>
+                    <span class="tp-loc ${isHome ? 'loc-home' : 'loc-away'}">${loc}</span>
+                    <span class="tp-opp">${opp}</span>
+                    <span class="tp-score">${scored}-${conceded}</span>
+                    <span class="form-badge ${resCls}" style="font-size:.72rem;min-width:18px;height:18px;line-height:18px">${resText}</span>
+                </div>`;
+            }).join('');
+
+        // Upcoming matches HTML
+        const upcomingHTML = upcomingFixtures.length === 0
+            ? '<p class="no-data" style="font-size:.82rem">Maç kalmadı.</p>'
+            : upcomingFixtures.map(f => {
+                const isHome = f.homeTeam.name === teamName;
+                const opp = isHome ? f.awayTeam.name : f.homeTeam.name;
+                const loc = isHome ? 'Ev' : 'Dep';
+                return `<div class="tp-match-row">
+                    <span class="tp-week">H${f.week}</span>
+                    <span class="tp-loc ${isHome ? 'loc-home' : 'loc-away'}">${loc}</span>
+                    <span class="tp-opp">${opp}</span>
+                    <span class="tp-score" style="color:#aaa">vs</span>
+                </div>`;
+            }).join('');
+
+        // Mini standings (show all, highlight this team)
+        const flag = this.leagues[team.league]?.flag || '';
+        const standingsHTML = standings.map((s, i) => {
+            const pos = i + 1;
+            const cls = this.getPositionClass(pos, team.league, europeanSpots);
+            const isThis = s.name === teamName;
+            return `<tr class="${cls} ${isThis ? 'tp-standing-highlight' : ''}">
+                <td>${pos}</td>
+                <td style="font-weight:${isThis ? '700' : '400'};font-size:${isThis ? '.82rem' : '.78rem'}">${s.name}</td>
+                <td>${s.played}</td>
+                <td>${s.won}</td>
+                <td>${s.drawn}</td>
+                <td>${s.lost}</td>
+                <td><strong>${s.points}</strong></td>
+            </tr>`;
+        }).join('');
+
+        const ratingBar = Math.round((this.normalizeRating(team.rating) / 9.9) * 100);
+
+        const html = `
+        <div class="team-profile">
+            <div class="tp-header">
+                <div class="tp-avatar">${teamName.charAt(0)}</div>
+                <div class="tp-title-block">
+                    <h2 class="tp-name">${teamName}</h2>
+                    <div class="tp-meta">${flag} ${team.league} &nbsp;·&nbsp; ${team.country}</div>
+                    <div class="tp-rating-row">
+                        <span class="tp-rating-label">Reyting</span>
+                        <div class="tp-rating-bar"><div class="tp-rating-fill" style="width:${ratingBar}%"></div></div>
+                        <span class="tp-rating-val">${this.normalizeRating(team.rating)}</span>
+                    </div>
+                </div>
+                <div class="tp-stat-badges">
+                    <div class="tp-stat-badge">
+                        <div class="tp-stat-num">${teamPosition || '?'}</div>
+                        <div class="tp-stat-lbl">Sıra</div>
+                    </div>
+                    <div class="tp-stat-badge">
+                        <div class="tp-stat-num">${teamStanding?.points ?? 0}</div>
+                        <div class="tp-stat-lbl">Puan</div>
+                    </div>
+                    <div class="tp-stat-badge">
+                        <div class="tp-stat-num">${teamStanding?.played ?? 0}</div>
+                        <div class="tp-stat-lbl">Maç</div>
+                    </div>
+                    <div class="tp-stat-badge">
+                        <div class="tp-stat-num">${teamStanding ? teamStanding.goalsFor - teamStanding.goalsAgainst : 0}</div>
+                        <div class="tp-stat-lbl">AG</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tp-body">
+                <!-- Form -->
+                <div class="tp-section tp-form-section">
+                    <div class="tp-section-title">Son 5 Maç Formu</div>
+                    <div class="tp-form-badges">
+                        ${formBadges || '<span style="color:#aaa;font-size:.82rem">Henüz maç yok</span>'}
+                    </div>
+                </div>
+
+                <div class="tp-grid">
+                    <!-- Past Matches -->
+                    <div class="tp-section">
+                        <div class="tp-section-title">Sezon Maçları</div>
+                        <div class="tp-matches-list">
+                            ${historyHTML}
+                        </div>
+                    </div>
+
+                    <!-- Upcoming -->
+                    <div class="tp-section">
+                        <div class="tp-section-title">Önümüzdeki Maçlar</div>
+                        <div class="tp-matches-list">
+                            ${upcomingHTML}
+                        </div>
+                    </div>
+
+                    <!-- Standings -->
+                    <div class="tp-section tp-standings-section">
+                        <div class="tp-section-title">${flag} ${team.league} Puan Durumu</div>
+                        <div class="tp-standings-wrap">
+                            <table class="tp-standings-table">
+                                <thead><tr><th>#</th><th>Takım</th><th>O</th><th>G</th><th>B</th><th>M</th><th>P</th></tr></thead>
+                                <tbody>${standingsHTML}</tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Squad -->
+                    <div class="tp-section tp-squad-section">
+                        <div class="tp-section-title">
+                            Kadro
+                            <button class="btn btn-sm btn-outline" onclick="window.footballSim.showCoachModal('${teamName.replace(/'/g,"\\'")}')">
+                                ⚽ Hoca Profili
+                            </button>
+                        </div>
+                        ${this.renderCoachCard(teamName)}
+                        ${this.renderSquadForProfile(teamName)}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+        document.getElementById('team-profile-content').innerHTML = html;
+        document.getElementById('team-profile-modal').classList.add('show');
+    }
+
+    // ==================== KOÇ SİSTEMİ ====================
+
+    getFormations() {
+        return ['4-4-2', '4-3-3', '4-2-3-1', '4-1-4-1', '3-5-2', '3-4-3', '5-3-2', '5-4-1', '4-5-1', '3-5-3'];
+    }
+
+    getTeamCoach(teamName) {
+        const team = this.teams.find(t => t.name === teamName);
+        return team?.coach || null;
+    }
+
+    renderCoachCard(teamName) {
+        const coach = this.getTeamCoach(teamName);
+        if (!coach) {
+            return `<div class="coach-card coach-empty">
+                <span style="color:#aaa;font-size:.85rem">Henüz hoca atanmamış</span>
+                <button class="btn btn-sm btn-primary" onclick="window.footballSim.showCoachModal('${teamName.replace(/'/g,"\\'")}')">
+                    <i class="fas fa-plus"></i> Hoca Ekle
+                </button>
+            </div>`;
+        }
+        return `<div class="coach-card" onclick="window.footballSim.showCoachModal('${teamName.replace(/'/g,"\\'")}')">
+            <div class="coach-avatar">👔</div>
+            <div class="coach-info">
+                <div class="coach-name">${coach.name}</div>
+                <div class="coach-formation">⚙️ Tercih Formasyon: <strong>${coach.preferredFormation || '4-4-2'}</strong></div>
+                <div class="coach-style">${coach.style || ''}</div>
+            </div>
+        </div>`;
+    }
+
+    showCoachModal(teamName) {
+        const team = this.teams.find(t => t.name === teamName);
+        if (!team) return;
+        const coach = team.coach || {};
+        const formations = this.getFormations();
+
+        const modalHtml = `
+        <div class="modal-content">
+            <span class="close" onclick="document.getElementById('coach-modal').classList.remove('show')">&times;</span>
+            <h3><i class="fas fa-user-tie"></i> Hoca - ${teamName}</h3>
+            <form id="coach-form" onsubmit="event.preventDefault(); window.footballSim.saveCoach('${teamName.replace(/'/g,"\\'")}')">
+                <div class="form-group">
+                    <label>Hoca Adı:</label>
+                    <input type="text" id="coach-name" required placeholder="Örn: Pep Guardiola" value="${coach.name || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Tercih Edilen Formasyon:</label>
+                    <select id="coach-formation" required>
+                        ${formations.map(f => `<option value="${f}" ${f === (coach.preferredFormation || '4-4-2') ? 'selected' : ''}>${f}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Taktik Stil (opsiyonel):</label>
+                    <select id="coach-style">
+                        <option value="" ${!coach.style ? 'selected' : ''}>Belirtilmemiş</option>
+                        <option value="Yüksek Baskı" ${'Yüksek Baskı' === coach.style ? 'selected' : ''}>Yüksek Baskı</option>
+                        <option value="Pres Futbolu" ${'Pres Futbolu' === coach.style ? 'selected' : ''}>Pres Futbolu</option>
+                        <option value="Pozisyon Oyunu" ${'Pozisyon Oyunu' === coach.style ? 'selected' : ''}>Pozisyon Oyunu</option>
+                        <option value="Kontr Atak" ${'Kontr Atak' === coach.style ? 'selected' : ''}>Kontr Atak</option>
+                        <option value="Savunma Ağırlıklı" ${'Savunma Ağırlıklı' === coach.style ? 'selected' : ''}>Savunma Ağırlıklı</option>
+                        <option value="Direkt Oyun" ${'Direkt Oyun' === coach.style ? 'selected' : ''}>Direkt Oyun</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('coach-modal').classList.remove('show')">İptal</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Kaydet</button>
+                </div>
+            </form>
+            ${coach.name ? `<div style="margin-top:1.5rem;border-top:1px solid #eee;padding-top:1rem">
+                <h4 style="font-size:.95rem;margin-bottom:.5rem">Hoca İstatistikleri</h4>
+                ${this.renderCoachStats(teamName)}
+            </div>` : ''}
+        </div>`;
+        document.getElementById('coach-modal').innerHTML = modalHtml;
+        document.getElementById('coach-modal').classList.add('show');
+    }
+
+    saveCoach(teamName) {
+        const name = document.getElementById('coach-name').value.trim();
+        const preferredFormation = document.getElementById('coach-formation').value;
+        const style = document.getElementById('coach-style').value;
+
+        if (!name) { alert('Hoca adı gerekli.'); return; }
+
+        const teamIdx = this.teams.findIndex(t => t.name === teamName);
+        if (teamIdx === -1) return;
+
+        this.teams[teamIdx].coach = { name, preferredFormation, style };
+        this.saveData();
+        document.getElementById('coach-modal').classList.remove('show');
+        this.showTeamProfile(teamName);
+        this.addActivity(`${teamName} - Hoca: ${name} (${preferredFormation})`);
+    }
+
+    renderCoachStats(teamName) {
+        const team = this.teams.find(t => t.name === teamName);
+        if (!team?.coach) return '<p class="no-data">-</p>';
+        const teamMatches = this.matches.filter(m =>
+            m.season === this.currentSeason &&
+            (m.homeTeam === teamName || m.awayTeam === teamName) &&
+            m.homeGoals !== undefined
+        );
+        let wins = 0, draws = 0, losses = 0;
+        teamMatches.forEach(m => {
+            const isHome = m.homeTeam === teamName;
+            const gs = isHome ? m.homeGoals : m.awayGoals;
+            const gc = isHome ? m.awayGoals : m.homeGoals;
+            if (gs > gc) wins++;
+            else if (gs === gc) draws++;
+            else losses++;
+        });
+        const total = wins + draws + losses;
+        const pts = wins * 3 + draws;
+        return `<div class="coach-stats-grid">
+            <div class="cs-item"><div class="cs-num">${total}</div><div class="cs-lbl">Maç</div></div>
+            <div class="cs-item" style="color:#22c55e"><div class="cs-num">${wins}</div><div class="cs-lbl">Galibiyet</div></div>
+            <div class="cs-item" style="color:#f59e0b"><div class="cs-num">${draws}</div><div class="cs-lbl">Beraberlik</div></div>
+            <div class="cs-item" style="color:#ef4444"><div class="cs-num">${losses}</div><div class="cs-lbl">Mağlubiyet</div></div>
+            <div class="cs-item" style="color:#667eea"><div class="cs-num">${pts}</div><div class="cs-lbl">Puan</div></div>
+        </div>`;
+    }
+
+    // ==================== GELİŞTİRİLMİŞ İSTATİSTİK SİSTEMİ ====================
+
+    // Mevkiye göre istatistik anahtarları
+    getPositionStats(position) {
+        const pos = position || '';
+        if (pos === 'Kaleci') {
+            return ['minutesPlayed', 'goals', 'assists', 'yellowCard', 'redCard', 'saves', 'cleanSheet', 'goalsConceded', 'rating'];
+        } else if (['Stoper', 'Sol Bek', 'Sağ Bek'].includes(pos)) {
+            return ['minutesPlayed', 'goals', 'assists', 'yellowCard', 'redCard', 'tackles', 'interceptions', 'clearances', 'duelsWon', 'rating'];
+        } else if (['Ön Libero', 'Merkez Orta Saha'].includes(pos)) {
+            return ['minutesPlayed', 'goals', 'assists', 'yellowCard', 'redCard', 'tackles', 'interceptions', 'passAccuracy', 'chances', 'rating'];
+        } else if (['Ofansif Orta Saha', 'Forvet Arkası'].includes(pos)) {
+            return ['minutesPlayed', 'goals', 'assists', 'yellowCard', 'redCard', 'shots', 'keyPasses', 'chances', 'dribbles', 'rating'];
+        } else if (['Sol Kanat', 'Sağ Kanat'].includes(pos)) {
+            return ['minutesPlayed', 'goals', 'assists', 'yellowCard', 'redCard', 'shots', 'crosses', 'dribbles', 'chances', 'rating'];
+        } else if (pos === 'Santrafor') {
+            return ['minutesPlayed', 'goals', 'assists', 'yellowCard', 'redCard', 'shots', 'shotsOnTarget', 'chances', 'aerialDuels', 'rating'];
+        }
+        return ['minutesPlayed', 'goals', 'assists', 'yellowCard', 'redCard', 'rating'];
+    }
+
+    getStatLabel(key) {
+        const labels = {
+            minutesPlayed: 'Dakika',
+            goals: 'Gol',
+            assists: 'Asist',
+            yellowCard: 'Sarı Kart',
+            redCard: 'Kırmızı',
+            saves: 'Kurtarış',
+            cleanSheet: 'Gol Yememe',
+            goalsConceded: 'Yenilen Gol',
+            tackles: 'Top Kapma',
+            interceptions: 'Müdahale',
+            clearances: 'Uzaklaştırma',
+            duelsWon: 'İkili Kazanma',
+            passAccuracy: 'Pas İsabeti %',
+            chances: 'Şans Yaratan',
+            shots: 'Şut',
+            shotsOnTarget: 'İsabetli Şut',
+            keyPasses: 'Kilit Pas',
+            dribbles: 'Dribbling',
+            crosses: 'Orta',
+            aerialDuels: 'Hava Topu',
+            rating: 'Puan'
+        };
+        return labels[key] || key;
+    }
+
+    // Oyuncu için mevkiye özel reyting hesapla
+    calculatePlayerRating(playerStats, position) {
+        const pos = position || '';
+        let score = 6.0;
+
+        if (pos === 'Kaleci') {
+            score += (playerStats.saves || 0) * 0.2;
+            score += (playerStats.cleanSheet ? 0.8 : 0);
+            score -= (playerStats.goalsConceded || 0) * 0.15;
+        } else if (['Stoper', 'Sol Bek', 'Sağ Bek'].includes(pos)) {
+            score += (playerStats.tackles || 0) * 0.12;
+            score += (playerStats.interceptions || 0) * 0.1;
+            score += (playerStats.clearances || 0) * 0.08;
+            score += (playerStats.goals || 0) * 0.5;
+            score += (playerStats.assists || 0) * 0.3;
+        } else if (['Ön Libero', 'Merkez Orta Saha'].includes(pos)) {
+            score += (playerStats.tackles || 0) * 0.1;
+            score += (playerStats.interceptions || 0) * 0.1;
+            score += (playerStats.goals || 0) * 0.5;
+            score += (playerStats.assists || 0) * 0.4;
+            score += ((playerStats.passAccuracy || 75) - 75) * 0.02;
+        } else if (['Ofansif Orta Saha', 'Forvet Arkası'].includes(pos)) {
+            score += (playerStats.goals || 0) * 0.6;
+            score += (playerStats.assists || 0) * 0.5;
+            score += (playerStats.keyPasses || 0) * 0.12;
+            score += (playerStats.chances || 0) * 0.1;
+        } else if (['Sol Kanat', 'Sağ Kanat'].includes(pos)) {
+            score += (playerStats.goals || 0) * 0.55;
+            score += (playerStats.assists || 0) * 0.45;
+            score += (playerStats.dribbles || 0) * 0.08;
+            score += (playerStats.crosses || 0) * 0.06;
+        } else if (pos === 'Santrafor') {
+            score += (playerStats.goals || 0) * 0.7;
+            score += (playerStats.assists || 0) * 0.3;
+            score += (playerStats.shotsOnTarget || 0) * 0.1;
+        } else {
+            score += (playerStats.goals || 0) * 0.5;
+            score += (playerStats.assists || 0) * 0.35;
+        }
+
+        // Kart cezaları
+        if (playerStats.yellowCard) score -= 0.3;
+        if (playerStats.redCard) score -= 1.0;
+
+        // Takım sonucu bonusu (playerStats'ta teamWon/teamLost var)
+        if (playerStats.teamWon) score += 0.4;
+        else if (playerStats.teamLost) score -= 0.2;
+
+        // Rastgele varyasyon
+        score += (Math.random() * 0.8 - 0.4);
+
+        return Math.min(10, Math.max(3.5, parseFloat(score.toFixed(1))));
+    }
+
     exportAllData() {
         const data = {
             teams: this.teams,
@@ -3471,9 +5436,16 @@ function filterTeamPoints() {
     window.footballSim.filterTeamPoints();
 }
 
+function showTeamProfile(teamName) {
+    window.footballSim.showTeamProfile(teamName);
+}
+
 function showMatchDetails(homeTeam, awayTeam, date) {
-    // This would show detailed match information
-    console.log('Match details:', homeTeam, 'vs', awayTeam, date);
+    // Legacy - try to find match by teams
+    const match = window.footballSim.matches.find(m => m.homeTeam === homeTeam && m.awayTeam === awayTeam);
+    if (match && match.id) {
+        window.footballSim.showMatchDetailsEnhanced(match.id);
+    }
 }
 
 function importData() {
